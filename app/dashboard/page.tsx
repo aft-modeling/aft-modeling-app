@@ -1,0 +1,22 @@
+import { createServerClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+
+export default async function DashboardPage() {
+  const supabase = createServerClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+
+  if (!profile) redirect('/login')
+
+  if (profile.role === 'creative_director') redirect('/dashboard/cd')
+  if (profile.role === 'editor') redirect('/dashboard/editor')
+  if (profile.role === 'qa') redirect('/dashboard/qa')
+
+  redirect('/login')
+}
