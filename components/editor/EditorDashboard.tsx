@@ -1,8 +1,10 @@
 'use client'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import StatusBadge from '@/components/StatusBadge'
 import SubmitClipModal from '@/components/editor/SubmitClipModal'
-import { Film, Clock, AlertCircle, ExternalLink, MessageSquare } from 'lucide-react'
+import { Film, Clock, AlertCircle, ExternalLink, MessageSquare , Play } from 'lucide-react'
 
 interface EditorDashboardProps {
   clips: any[]
@@ -12,6 +14,16 @@ interface EditorDashboardProps {
 
 export default function EditorDashboard({ clips, submissions, editorId }: EditorDashboardProps) {
   const [selectedClip, setSelectedClip] = useState<any>(null)
+  const supabase = createClient()
+  const router = useRouter()
+
+  const startWorking = async (clipId: string) => {
+    const { error } = await supabase
+      .from('clips')
+      .update({ status: 'in_progress', updated_at: new Date().toISOString() })
+      .eq('id', clipId)
+    if (!error) router.refresh()
+  }
 
   const pending = clips.filter(c => c.status === 'assigned' || c.status === 'in_progress')
   const revisions = clips.filter(c => c.status === 'needs_revision')
@@ -101,11 +113,20 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
                   </div>
                   {clip.additional_notes && (
                     <p className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1">
-                      📝 {clip.additional_notes}
+                      ð {clip.additional_notes}
                     </p>
                   )}
                 </div>
-                <button
+                {clip.status === 'assigned' && (
+                      <button
+                        onClick={() => startWorking(clip.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors"
+                      >
+                        <Play size={12} />
+                        Start Working
+                      </button>
+                    )}
+                    <button
                   onClick={() => setSelectedClip(clip)}
                   className="btn-primary shrink-0"
                 >
@@ -135,7 +156,7 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
               <tbody className="divide-y divide-gray-50">
                 {submissions.slice(0,10).map(sub => (
                   <tr key={sub.id} className="hover:bg-gray-50/50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{sub.clip?.name || '—'}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{sub.clip?.name || 'â'}</td>
                     <td className="px-4 py-3 text-gray-500">#{sub.round}</td>
                     <td className="px-4 py-3"><StatusBadge status={sub.status} /></td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
@@ -147,7 +168,7 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
                           className="text-brand-600 hover:text-brand-700 text-xs font-medium flex items-center gap-1">
                           <ExternalLink className="w-3 h-3" /> View
                         </a>
-                      ) : '—'}
+                      ) : 'â'}
                     </td>
                   </tr>
                 ))}
