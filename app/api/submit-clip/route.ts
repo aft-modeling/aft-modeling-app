@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { uploadFileToDrive } from '@/lib/google-drive'
 
@@ -7,71 +7,91 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
-  try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    try {
+          const cookieStore = cookies()
+          const supabase = createServerClient(
+                  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                      cookies: {
+                                  getAll() {
+                                                return cookieStore.getAll()
+                                  },
+                                  setAll(cookiesToSet) {
+                                                try {
+                                                                cookiesToSet.forEach(({ name, value, options }) =>
+                                                                                  cookieStore.set(name, value, options)
+                                                                                                   )
+                                                } catch {}
+                                  },
+                      },
+            }
+                )
 
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-    const clipId = formData.get('clipId') as string
-    const clipName = formData.get('clipName') as string
-    const editorId = formData.get('editorId') as string
-    const driveUsedContentLink = formData.get('driveUsedContentLink') as string
+      const { data: { session } } = await supabase.auth.getSession()
+          if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!file || !clipId) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      const formData = await req.formData()
+          const file = formData.get('file') as File
+          const clipId = formData.get('clipId') as string
+          const clipName = formData.get('clipName') as string
+          const editorId = formData.get('editorId') as string
+          const driveUsedContentLink = formData.get('driveUsedContentLink') as string
 
-    // Get editor name for Drive folder
-    const { data: editor } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', editorId)
-      .single()
+      if (!file || !clipId) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
 
-    // Determine round number (count existing submissions for this clip)
-    const { count } = await supabase
-      .from('submissions')
-      .select('*', { count: 'exact', head: true })
-      .eq('clip_id', clipId)
+      // Get editor name for Drive folder
+      const { data: editor } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', editorId)
+            .single()
 
-    const round = (count || 0) + 1
+      // Determine round number (count existing submissions for this clip)
+      const { count } = await supabase
+            .from('submissions')
+            .select('*', { count: 'exact', head: true })
+            .eq('clip_id', clipId)
 
-    // Upload file to Google Drive
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const { id: driveFileId, webViewLink } = await uploadFileToDrive(
-      buffer,
-      `${clipName}_Round${round}_${file.name}`,
-      file.type || 'video/mp4',
-      editor?.full_name || 'Unknown',
-      clipName
-    )
+      const round = (count || 0) + 1
 
-    // Create submission record
-    const { data: submission, error: subError } = await supabase
-      .from('submissions')
-      .insert({
-        clip_id: clipId,
-        editor_id: editorId,
-        round,
-        drive_file_id: driveFileId,
-        drive_view_link: webViewLink,
-        drive_used_content_link: driveUsedContentLink || null,
-        status: 'pending_qa',
-      })
-      .select()
-      .single()
+      // Upload file to Google Drive
+      const buffer = Buffer.from(await file.arrayBuffer())
+          const { id: driveFileId, webViewLink } = await uploadFileToDrive(
+                  buffer,
+                  `${clipName}_Round${round}_${file.name}`,
+                  file.type || 'video/mp4',
+                  editor?.full_name || 'Unknown',
+                  clipName
+                )
 
-    if (subError) throw new Error(subError.message)
+      // Create submission record
+      const { data: submission, error: subError } = await supabase
+            .from('submissions')
+            .insert({
+                      clip_id: clipId,
+                      editor_id: editorId,
+                      round,
+                      drive_file_id: driveFileId,
+                      drive_view_link: webViewLink,
+                      drive_used_content_link: driveUsedContentLink || null,
+                      status: 'pending_qa',
+            })
+            .select()
+            .single()
 
-    // Update clip status to 'submitted'
-    await supabase
-      .from('clips')
-      .update({ status: 'in_qa', updated_at: new Date().toISOString() })
-      .eq('id', clipId)
+      if (subError) throw new Error(subError.message)
 
-    return NextResponse.json({ success: true, submission })
-  } catch (err: any) {
-    console.error('submit-clip error:', err)
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
-  }
+      // Update clip status to 'submitted'
+      await supabase
+            .from('clips')
+            .update({ status: 'in_qa', updated_at: new Date().toISOString() })
+            .eq('id', clipId)
+
+      return NextResponse.json({ success: true, submission })
+
+    } catch (err: any) {
+          console.error('submit-clip error:', err)
+          return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
+    }
 }
