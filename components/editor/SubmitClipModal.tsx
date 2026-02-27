@@ -21,19 +21,20 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
   function handleFileDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragOver(false)
-    const f = e.dataTransfer.files[0]
-    if (f) setFile(f)
+    const dropped = e.dataTransfer.files[0]
+    if (dropped) setFile(dropped)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!file) { setError('Please select a file to upload'); return }
     setLoading(true)
     setError('')
 
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      if (file) {
+        formData.append('file', file)
+      }
       formData.append('clipId', clip.id)
       formData.append('clipName', clip.name)
       formData.append('editorId', editorId)
@@ -44,8 +45,10 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
         body: formData,
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Submission failed')
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to submit clip')
+      }
 
       router.refresh()
       onClose()
@@ -77,27 +80,31 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
         {clip.example_reel_url && (
           <div className="bg-brand-50 border border-brand-100 rounded-lg p-3">
             <p className="text-xs font-medium text-brand-700 mb-1">Reference Reel</p>
-            <a href={clip.example_reel_url} target="_blank" rel="noopener noreferrer"
-              className="text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1">
+            <a
+              href={clip.example_reel_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1"
+            >
               <ExternalLink className="w-3 h-3" />
-              {clip.example_reel_url}
+              View example reel
             </a>
           </div>
         )}
 
-        {clip.additional_notes && (
-          <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-            <p className="text-xs font-medium text-amber-700 mb-1">Director Notes</p>
-            <p className="text-xs text-amber-600">{clip.additional_notes}</p>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* File Upload */}
+          {/* File Upload (Optional) */}
           <div>
-            <label className="label">Finished Clip File <span className="text-red-500">*</span></label>
+            <label className="label">Upload Video File (Optional)</label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="video/*,.mp4,.mov,.avi"
+              className="hidden"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
             <div
-              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleFileDrop}
               onClick={() => fileRef.current?.click()}
@@ -122,16 +129,9 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
                 </div>
               )}
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={e => e.target.files?.[0] && setFile(e.target.files[0])}
-            />
           </div>
 
-          {/* Drive Link for Used Content */}
+          {/* Drive Link */}
           <div>
             <label className="label">Drive Link to Used Content</label>
             <input
@@ -153,8 +153,8 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
             <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">
               Cancel
             </button>
-            <button type="submit" className="btn-primary flex-1 justify-center" disabled={loading || !file}>
-              {loading ? 'Uploading to Drive...' : 'Submit for QA'}
+            <button type="submit" className="btn-primary flex-1 justify-center" disabled={loading}>
+              {loading ? 'Submitting...' : 'Submit for QA'}
             </button>
           </div>
         </form>
