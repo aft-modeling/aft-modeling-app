@@ -2,7 +2,8 @@
 import { useState } from 'react'
 import StatusBadge from '@/components/StatusBadge'
 import AddClipModal from '@/components/cd/AddClipModal'
-import { Film, Plus, TrendingUp, Clock, CheckCircle, AlertCircle, Trophy } from 'lucide-react'
+import EditClipModal from '@/components/cd/EditClipModal'
+import { Film, Plus, TrendingUp, Clock, CheckCircle, AlertCircle, Trophy, Pencil } from 'lucide-react'
 
 interface CDDashboardProps {
   clips: any[]
@@ -21,6 +22,7 @@ const COLUMNS = [
 
 export default function CDDashboard({ clips, editors, finishedClips }: CDDashboardProps) {
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingClip, setEditingClip] = useState<any>(null)
   const [selectedEditor, setSelectedEditor] = useState('all')
 
   const filtered = selectedEditor === 'all'
@@ -105,7 +107,14 @@ export default function CDDashboard({ clips, editors, finishedClips }: CDDashboa
                 {colClips.map(clip => (
                   <div key={clip.id} className="card p-3 space-y-2 hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between gap-1">
-                      <p className="text-sm font-medium text-gray-900 leading-tight">{clip.name}</p>
+                      <p className="text-sm font-medium text-gray-900 leading-tight">{clip.name}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingClip(clip); }}
+                      className="ml-2 p-1 text-gray-400 hover:text-indigo-600 rounded"
+                      title="Edit clip"
+                    >
+                      <Pencil size={14} />
+                    </button></p>
                     </div>
                     {clip.assigned_editor && (
                       <div className="flex items-center gap-1.5">
@@ -122,7 +131,7 @@ export default function CDDashboard({ clips, editors, finishedClips }: CDDashboa
                       {clip.example_reel_url && (
                         <a href={clip.example_reel_url} target="_blank" rel="noopener noreferrer"
                           className="text-xs text-brand-600 hover:text-brand-700 font-medium">
-                          Example ↗
+                          Example â
                         </a>
                       )}
                     </div>
@@ -141,6 +150,14 @@ export default function CDDashboard({ clips, editors, finishedClips }: CDDashboa
 
       {showAddModal && (
         <AddClipModal editors={editors} onClose={() => setShowAddModal(false)} />
+      )}
+
+      {editingClip && (
+        <EditClipModal
+          clip={editingClip}
+          editors={editors}
+          onClose={() => setEditingClip(null)}
+        />
       )}
     </div>
   )
