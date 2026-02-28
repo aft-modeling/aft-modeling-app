@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Clip, Profile, Submission, FinishedClip, ClipStatus } from '@/lib/types'
 import clsx from 'clsx'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Film, Plus, TrendingUp, Clock, CheckCircle, AlertCircle, Trophy, Pencil } from 'lucide-react'
+import AddClipModal from '@/components/cd/AddClipModal'
+import EditClipModal from '@/components/cd/EditClipModal'
 
 interface AdminDashboardProps {
   clips: Clip[]
@@ -34,6 +36,9 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const [error, setError] = useState('')
   const [selectedEditor, setSelectedEditor] = useState<string>('')
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [editingClip, setEditingClip] = useState<any>(null)
+  const [cdEditorFilter, setCdEditorFilter] = useState('all')
 
   const editors = profiles.filter(p => p.role === 'editor')
 
@@ -114,6 +119,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
             { id: 'pipeline', label: 'Pipeline Overview' },
             { id: 'editors', label: 'Editor Portals' },
             { id: 'manage', label: 'Manage Editors' },
+              { id: 'cd', label: 'Creative Director' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -350,6 +356,97 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Creative Director Tab */}
+        {currentTab === 'cd' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Pipeline Overview</h2>
+                <p className="text-sm text-gray-500">Track all clips across your content workflow</p>
+              </div>
+              <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2">
+                <Plus size={16} /> New Clip
+              </button>
+            </div>
+
+            <div className="grid grid-cols-5 gap-4">
+              {[
+                { label: 'TOTAL CLIPS', value: clips.length, icon: Film, color: 'text-brand-600' },
+                { label: 'IN PROGRESS', value: clips.filter(x => x.status === 'in_progress').length, icon: TrendingUp, color: 'text-amber-500' },
+                { label: 'IN QA', value: clips.filter(x => x.status === 'in_qa' || x.status === 'submitted').length, icon: Clock, color: 'text-orange-500' },
+                { label: 'REVISIONS', value: clips.filter(x => x.status === 'needs_revision').length, icon: AlertCircle, color: 'text-red-500' },
+                { label: 'FINISHED', value: finishedClips.length, icon: Trophy, color: 'text-emerald-500' },
+              ].map(stat => (
+                <div key={stat.label} className="card p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{stat.label}</span>
+                    <stat.icon size={16} className={stat.color} />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-600">Filter by editor:</span>
+              <button onClick={() => setCdEditorFilter('all')} className={`px-3 py-1 text-sm rounded-full ${cdEditorFilter === 'all' ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>All</button>
+              {editors.map(e => (
+                <button key={e.id} onClick={() => setCdEditorFilter(e.id)} className={`px-3 py-1 text-sm rounded-full ${cdEditorFilter === e.id ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{e.full_name}</button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-5 gap-4">
+              {[
+                { key: 'assigned', label: 'Assigned', color: 'border-blue-400' },
+                { key: 'in_progress', label: 'In Progress', color: 'border-amber-400' },
+                { key: 'in_qa', label: 'In QA', color: 'border-orange-400' },
+                { key: 'needs_revision', label: 'Needs Revision', color: 'border-red-400' },
+                { key: 'approved', label: 'Approved', color: 'border-emerald-400' },
+              ].map(col => {
+                const fClips = cdEditorFilter === 'all' ? clips : clips.filter(x => x.assigned_editor_id === cdEditorFilter)
+                const colClips = col.key === 'in_qa' ? fClips.filter(x => x.status === 'in_qa' || x.status === 'submitted') : fClips.filter(x => x.status === col.key)
+                return (
+                  <div key={col.key} className="space-y-2">
+                    <div className={`card px-3 py-2.5 border-t-2 ${col.color} flex items-center justify-between`}>
+                      <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{col.label}</span>
+                      <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-0.5 rounded-full">{colClips.length}</span>
+                    </div>
+                    <div className="space-y-2 min-h-[200px]">
+                      {colClips.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No clips</p>}
+                      {colClips.map((clip: any) => (
+                        <div key={clip.id} className="card p-3 space-y-2 hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between gap-1">
+                            <p className="text-sm font-medium text-gray-900 leading-tight">{clip.name}
+                            <button onClick={(e) => { e.stopPropagation(); setEditingClip(clip); }} className="ml-2 p-1 text-gray-400 hover:text-indigo-600 rounded" title="Edit clip"><Pencil size={14} /></button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteClip(clip.id, clip.name); }} className="ml-1 p-1 text-gray-400 hover:text-red-600 rounded" title="Delete clip" disabled={deleting === clip.id}>
+                              {deleting === clip.id ? <span className="inline-block w-3.5 h-3.5 border-2 border-red-300 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
+                            </button></p>
+                          </div>
+                          {clip.assigned_editor && (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-4 h-4 bg-brand-100 rounded-full flex items-center justify-center">
+                                <span className="text-[10px] font-medium text-brand-700">{(clip.assigned_editor.full_name || clip.assigned_editor.email || '?')[0].toUpperCase()}</span>
+                              </div>
+                              <span className="text-xs text-gray-500">{clip.assigned_editor.full_name}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-400">Due: {clip.due_date}</span>
+                            {clip.example_reel_url && <a href={clip.example_reel_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:underline">Example</a>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {showAddModal && <AddClipModal editors={editors} onClose={() => setShowAddModal(false)} />}
+            {editingClip && <EditClipModal clip={editingClip} editors={editors} onClose={() => setEditingClip(null)} />}
           </div>
         )}
       </div>
