@@ -18,11 +18,9 @@ export default function AddClipModal({ editors, onClose }: AddClipModalProps) {
     name: '',
     example_reel_url: '',
     additional_notes: '',
-    due_date: 'Sunday',
+    due_date: '',
     assigned_editor_id: '',
   })
-
-  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -36,7 +34,7 @@ export default function AddClipModal({ editors, onClose }: AddClipModalProps) {
       name: form.name,
       example_reel_url: form.example_reel_url,
       additional_notes: form.additional_notes || null,
-      due_date: form.due_date,
+      due_date: form.due_date || null,
       assigned_editor_id: form.assigned_editor_id || null,
       status: form.assigned_editor_id ? 'assigned' : 'assigned',
       created_by: session.user.id,
@@ -87,13 +85,12 @@ export default function AddClipModal({ editors, onClose }: AddClipModalProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Due Date</label>
-              <select
+              <input
+                type="date"
                 className="input"
                 value={form.due_date}
                 onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))}
-              >
-                {days.map(d => <option key={d}>{d}</option>)}
-              </select>
+              />
             </div>
             <div>
               <label className="label">Assign to Editor</label>
