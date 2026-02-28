@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { Trash2, Film, Plus, TrendingUp, Clock, CheckCircle, AlertCircle, Trophy, Pencil } from 'lucide-react'
 import AddClipModal from '@/components/cd/AddClipModal'
 import EditClipModal from '@/components/cd/EditClipModal'
+import ClipDetailModal from '@/components/ClipDetailModal'
 
 interface AdminDashboardProps {
   clips: Clip[]
@@ -44,6 +45,14 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const [error, setError] = useState('')
   const [selectedEditor, setSelectedEditor] = useState<string>('')
   const [deleting, setDeleting] = useState<string | null>(null)
+
+      {detailClip && (
+        <ClipDetailModal
+          clipId={detailClip.id}
+          onClose={() => setDetailClip(null)}
+        />
+      )}
+
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingClip, setEditingClip] = useState<any>(null)
   const [cdEditorFilter, setCdEditorFilter] = useState('all')
@@ -162,7 +171,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                         <p className="text-xs text-gray-400 text-center py-4">No clips</p>
                       )}
                       {colClips.map((clip: any) => (
-                        <div key={clip.id} className={clsx('p-3 rounded-lg border', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')}>
+                        <div key={clip.id} className={clsx('p-3 rounded-lg border', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')} onClick={() => setDetailClip(clip)} style={{cursor:"pointer"}}>
                           <div className="flex items-start justify-between gap-1">
                             <p className="text-sm font-medium text-gray-900 truncate">{clip.name || clip.clip_name}</p>
                             <button onClick={() => handleDeleteClip(clip.id, clip.name || clip.clip_name)} className="p-1 text-gray-400 hover:text-red-600 rounded flex-shrink-0" title="Delete clip" disabled={deleting === clip.id}>
@@ -212,7 +221,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                     <p className="text-sm text-gray-500">No clips assigned to this editor.</p>
                   )}
                   {clips.filter(c => c.assigned_editor_id === selectedEditor).map(clip => (
-                    <div key={clip.id} className={clsx('flex items-center justify-between p-3 rounded-lg border', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')}>
+                    <div key={clip.id} className={clsx('flex items-center justify-between p-3 rounded-lg border', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')} onClick={() => setDetailClip(clip)} style={{cursor:"pointer"}}>
                       <div>
                         <p className="text-sm font-medium text-gray-900">{clip.name}</p>
                         <p className={clsx('text-xs', isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-500')}>
