@@ -45,6 +45,15 @@ export default function AddClipModal({ editors, onClose }: AddClipModalProps) {
       setLoading(false)
     } else {
       router.refresh()
+
+      // Notify assigned editor about new clip
+      if (form.assigned_editor_id) {
+        await supabase.from('notifications').insert({
+          user_id: form.assigned_editor_id,
+          message: `New clip assigned to you: ${form.name}`,
+          type: 'clip_assigned',
+        })
+      }
       onClose()
     }
   }
