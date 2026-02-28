@@ -5,85 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import StatusBadge from '@/components/StatusBadge'
 import SubmitClipModal from '@/components/editor/SubmitClipModal'
-import { Film, Clock, AlertCircle, ExternalLink, MessageSquare, Play, AlertTriangle } from 'lucide-react'
-
-interface EditorDashboardProps {
-  clips: any[]
-  submissions: any[]
-  editorId: string
-}
-
-function isOverdue(dueDate: string | null, status: string): boolean {
-  if (!dueDate || status === 'finished' || status === 'approved') return false
-  const due = new Date(dueDate)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return due < today
-}
-
-export default function EditorDashboard({ clips, submissions, editorId }: EditorDashboardProps) {
-  const [selectedClip, setSelectedClip] = useState<any>(null)
-  const supabase = createClient()
-  const router = useRouter()
-
-  const startWorking = async (clipId: string) => {
-    const { error } = await supabase
-      .from('clips')
-      .update({ status: 'in_progress', updated_at: new Date().toISOString() })
-      .eq('id', clipId)
-    if (!error) router.refresh()
-  }
-
-  const pending = clips.filter(c => c.status === 'assigned' || c.status === 'in_progress')
-  const revisions = clips.filter(c => c.status === 'needs_revision')
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1>My Assignments</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Clips assigned to you that need your attention</p>
-      </div>
-
-      {/* Revision Alert */}
-      {revisions.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertCircle className="w-4 h-4 text-red-600" />
-            <span className="text-sm font-semibold text-red-700">
-              {revisions.length} clip{revisions.length > 1 ? 's' : ''} need{revisions.length === 1 ? 's' : ''} revision
-            </span>
-          </div>
-          <div className="space-y-2">
-            {revisions.map(clip => {
-              const latestSub = submissions.find(s => s.clip_id === clip.id)
-              const latestReview = latestSub?.qa_reviews?.[0]
-              return (
-                <div key={clip.id} className="bg-white rounded-lg p-3 border border-red-100">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{clip.name}</p>
-                      {latestReview?.qa_notes && (
-                        <div className="mt-1.5 flex items-start gap-1.5">
-                          <MessageSquare className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
-                          <p className="text-xs text-gray-600">{latestReview.qa_notes}</p>
-                        </div>
-                      )}
-                    </div>
-                    <button onClick={() => setSelectedClip(clip)} className="btn-danger text-xs py-1.5 px-3 shrink-0">
-                      Resubmit
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import StatusBadge from '@/components/StatusBadge'
-import SubmitClipModal from '@/components/editor/SubmitClipModal'
 import ClipDetailModal from '@/components/ClipDetailModal'
 import { Film, Clock, AlertCircle, ExternalLink, MessageSquare, Play, AlertTriangle, ChevronDown, ChevronUp, CheckCircle, XCircle } from 'lucide-react'
 
@@ -101,7 +22,6 @@ function isOverdue(dueDate: string | null, status: string): boolean {
   due.setHours(0, 0, 0, 0)
   return due < today
 }
-
 export default function EditorDashboard({ clips, submissions, editorId }: EditorDashboardProps) {
   const [selectedClip, setSelectedClip] = useState<any>(null)
   const [detailClip, setDetailClip] = useState<any>(null)
@@ -132,7 +52,6 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
 
   const pending = clips.filter(c => c.status === 'assigned' || c.status === 'in_progress')
   const revisions = clips.filter(c => c.status === 'needs_revision')
-
   return (
     <div className="space-y-6">
 
@@ -199,7 +118,6 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
           </div>
         </div>
       )}
-
       {/* Active Clips */}
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -237,10 +155,9 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
                         <ExternalLink className="w-3.5 h-3.5" /> Example Reel
                       </a>
                     )}
-                  </div>
-                  {clip.additional_notes && (
+                  </div>                  {clip.additional_notes && (
                     <p className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1">
-                      \ud83d\udcdd {clip.additional_notes}
+                      📝 {clip.additional_notes}
                     </p>
                   )}
 
@@ -289,7 +206,6 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
           </div>
         )}
       </div>
-
       {/* Recent Submissions */}
       {submissions.length > 0 && (
         <div>
@@ -308,7 +224,7 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
               <tbody className="divide-y divide-gray-50">
                 {submissions.slice(0,10).map((sub: any) => (
                   <tr key={sub.id} className="hover:bg-gray-50/50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{sub.clip?.name || '\u2014'}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{sub.clip?.name || '—'}</td>
                     <td className="px-4 py-3 text-gray-500">#{sub.round}</td>
                     <td className="px-4 py-3"><StatusBadge status={sub.status} /></td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
@@ -320,7 +236,7 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
                           className="text-brand-600 hover:text-brand-700 text-xs font-medium flex items-center gap-1">
                           <ExternalLink className="w-3 h-3" /> View
                         </a>
-                      ) : '\u2014'}
+                      ) : '—'}
                     </td>
                   </tr>
                 ))}
@@ -346,4 +262,4 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
       )}
     </div>
   )
-    }
+}
