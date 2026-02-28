@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
 
-      // Accept JSON body (file already uploaded directly to Supabase Storage from client)
       const body = await req.json()
       const { clipId, clipName, editorId, driveUsedContentLink, storagePath, fileUrl } = body
 
@@ -75,48 +74,56 @@ export async function POST(req: NextRequest) {
       }
 
       // Update clip status
-      await supabaseAdmin
+      const { error: clipUpdateError } = await supabaseAdmin
         .from('clips')
         .update({ status: 'submitted' })
         .eq('id', clipId)
 
-    console.log('[NOTIFY] Starting QA notification...')
+      if (clipUpdateError) {
+        console.error('Clip update error:', clipUpdateError)
+      }
+
       // Notify all QA users about new submission
-      const { data: qaUsers } = await supabaseAdmin
+      console.log('[NOTIFY] Starting QA notification for clip:', clipId)
+      const { data: qaUsers, error: qaError } = await supabaseAdmin
         .from('profiles')
         .select('id')
         .eq('role', 'qa')
-    console.log('[NOTIFY] QA users found:', JSON.stringify(qaUsers))
+      console.log('[NOTIFY] QA users found:', JSON.stringify(qaUsers), 'error:', JSON.stringify(qaError))
 
       if (qaUsers && qaUsers.length > 0) {
         const editorName = editor?.full_name || 'An editor'
-      const { error: notifError } = await supabaseAdmin.from('notifications').insert(
-          qaUsers.map((qa: any) => ({
-            user_id: qa.id,
-            message: `${editorName} submitted "${clipName || 'a clip'}" for QA review (Round ${round})`,
-            type: 'submission_reviewed',
-            clip_id: clipId,
-          }))
-        )
-      if (notifError) console.error('[NOTIFY] Insert error:', notifError)
-      else console.log('[NOTIFY] Notifications inserted successfully')
+        const notifPayload = qaUsers.map((qa) => ({
+          user_id: qa.id,
+          message: editorName + ' submitted "' + (clipName || 'a clip') + '" for QA review (Round ' + round + ')',
+          type: 'submission_reviewed',
+          clip_id: clipId,
+        }))
+        console.log('[NOTIFY] Inserting notifications:', JSON.stringify(notifPayload))
+        const { data: notifData, error: notifError } = await supabaseAdmin.from('notifications').insert(notifPayload).select()
+        if (notifError) {
+          console.error('[NOTIFY] Insert error:', JSON.stringify(notifError))
+        } else {
+          console.log('[NOTIFY] Notifications inserted successfully:', JSON.stringify(notifData))
+        }
+      } else {
+        console.log('[NOTIFY] No QA users found, skipping notification')
       }
 
       return NextResponse.json({ success: true, round })
 
-    } catch (innerError: any) {
+    } catch (innerError) {
       console.error('Submit clip inner error:', innerError)
       return NextResponse.json(
-        { error: innerError.message || 'Internal error' },
+        { error: innerError instanceof Error ? innerError.message : 'Internal error' },
         { status: 500 }
       )
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Submit clip error:', error)
     return NextResponse.json(
-      { error: error.message || 'Server error' },
+      { error: error instanceof Error ? error.message : 'Server error' },
       { status: 500 }
     )
   }
 }
-h
