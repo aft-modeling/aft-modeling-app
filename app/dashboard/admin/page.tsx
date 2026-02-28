@@ -16,32 +16,31 @@ export default async function AdminPage() {
 
   if (!profile || profile.role !== 'admin') redirect('/dashboard')
 
-  const { data: clips } = await supabase
-    .from('clips')
-    .select('*, assigned_editor:profiles(id, full_name, email)')
-    .order('created_at', { ascending: false })
-
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, full_name, email, role, created_at')
-    .order('created_at', { ascending: false })
-
-  const { data: submissions } = await supabase
-    .from('submissions')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  const { data: finishedClips } = await supabase
-    .from('finished_clips')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const [clipsRes, profilesRes, submissionsRes, finishedRes] = await Promise.all([
+    supabase
+      .from('clips')
+      .select('*, assigned_editor:profiles!clips_assigned_editor_id_fkey(id, full_name, email)')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, role, created_at')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('submissions')
+      .select('*')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('finished_clips')
+      .select('*')
+      .order('created_at', { ascending: false }),
+  ])
 
   return (
     <AdminDashboard
-      clips={clips ?? []}
-      profiles={profiles ?? []}
-      submissions={submissions ?? []}
-      finishedClips={finishedClips ?? []}
+      clips={clipsRes.data ?? []}
+      profiles={profilesRes.data ?? []}
+      submissions={submissionsRes.data ?? []}
+      finishedClips={finishedRes.data ?? []}
     />
   )
 }
