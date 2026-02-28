@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Clip, Profile, Submission, FinishedClip, ClipStatus } from '@/lib/types'
 import clsx from 'clsx'
+import { Trash2 } from 'lucide-react'
 
 interface AdminDashboardProps {
   clips: Clip[]
@@ -32,6 +33,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [selectedEditor, setSelectedEditor] = useState<string>('')
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const editors = profiles.filter(p => p.role === 'editor')
 
@@ -78,6 +80,25 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDeleteClip(clipId: string, clipName: string) {
+    if (!confirm(`Are you sure you want to delete "${clipName}"? This will remove all submissions, reviews, and files. This cannot be undone.`)) return
+    setDeleting(clipId)
+    try {
+      const res = await fetch('/api/clips/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clipId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete clip')
+      router.refresh()
+    } catch (err: any) {
+      alert('Delete failed: ' + err.message)
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -131,7 +152,21 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                       )}
                       {colClips.map((clip: any) => (
                         <div key={clip.id} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                          <p className="text-sm font-medium text-gray-900 truncate">{clip.name || clip.clip_name}</p>
+                          <div className="flex items-start justify-between gap-1">
+                            <p className="text-sm font-medium text-gray-900 truncate">{clip.name || clip.clip_name}</p>
+                            <button
+                              onClick={() => handleDeleteClip(clip.id, clip.name || clip.clip_name)}
+                              className="p-1 text-gray-400 hover:text-red-600 rounded flex-shrink-0"
+                              title="Delete clip"
+                              disabled={deleting === clip.id}
+                            >
+                              {deleting === clip.id ? (
+                                <span className="inline-block w-3.5 h-3.5 border-2 border-red-300 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 size={14} />
+                              )}
+                            </button>
+                          </div>
                           {clip.assigned_editor && (
                             <p className="text-xs text-gray-500 mt-1">
                               Editor: {clip.assigned_editor.full_name || clip.assigned_editor.email}
