@@ -1,4 +1,4 @@
-export type Role = 'creative_director' | 'editor' | 'qa'
+export type Role = 'creative_director' | 'editor' | 'qa' | 'admin'
 
 export type ClipStatus =
   | 'assigned'        // CD assigned to editor
