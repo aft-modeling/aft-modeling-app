@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import StatusBadge from '@/components/StatusBadge'
 import AddClipModal from '@/components/cd/AddClipModal'
 import EditClipModal from '@/components/cd/EditClipModal'
+import ClipDetailModal from '@/components/ClipDetailModal'
 import { Film, Plus, TrendingUp, Clock, CheckCircle, AlertCircle, Trophy, Pencil, Trash2 } from 'lucide-react'
 
 interface CDDashboardProps {
@@ -31,6 +32,7 @@ function isOverdue(dueDate: string | null, status: string): boolean {
 }
 export default function CDDashboard({ clips, editors, finishedClips }: CDDashboardProps) {
   const [showAddModal, setShowAddModal] = useState(false)
+  const [detailClip, setDetailClip] = useState<any>(null)
   const [editingClip, setEditingClip] = useState<any>(null)
   const router = useRouter()
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -128,7 +130,7 @@ export default function CDDashboard({ clips, editors, finishedClips }: CDDashboa
               </div>
               <div className="space-y-2 min-h-[200px]">
                 {colClips.map(clip => (
-                  <div key={clip.id} className={`card p-3 space-y-2 hover:shadow-md transition-shadow ${isOverdue(clip.due_date, clip.status) ? 'ring-2 ring-red-300 bg-red-50/30' : ''}`}>
+                  <div key={clip.id} className={`card p-3 space-y-2 hover:shadow-md transition-shadow cursor-pointer ${isOverdue(clip.due_date, clip.status) ? 'ring-2 ring-red-300 bg-red-50/30' : ''}`} onClick={() => setDetailClip(clip)}>
                     <div className="flex items-start justify-between gap-1">
                       <p className="text-sm font-medium text-gray-900 leading-tight">{clip.name}
                         <button onClick={(e) => { e.stopPropagation(); setEditingClip(clip); }} className="ml-2 p-1 text-gray-400 hover:text-indigo-600 rounded" title="Edit clip"><Pencil size={14} /></button>
@@ -150,7 +152,7 @@ export default function CDDashboard({ clips, editors, finishedClips }: CDDashboa
                       </span>
                       {clip.example_reel_url && (
                         <a href={clip.example_reel_url} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-brand-600 hover:text-brand-700 font-medium">Example \u2197</a>
+                          className="text-xs text-brand-600 hover:text-brand-700 font-medium">Example ↗</a>
                       )}
                     </div>
                   </div>
@@ -165,6 +167,14 @@ export default function CDDashboard({ clips, editors, finishedClips }: CDDashboa
           )
         })}
       </div>
+
+
+      {detailClip && (
+        <ClipDetailModal
+          clipId={detailClip.id}
+          onClose={() => setDetailClip(null)}
+        />
+      )}
 
       {showAddModal && (
         <AddClipModal editors={editors} onClose={() => setShowAddModal(false)} />
