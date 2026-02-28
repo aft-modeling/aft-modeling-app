@@ -16,6 +16,7 @@ export default async function DashboardPage() {
 
   if (profile.role === 'creative_director') redirect('/dashboard/cd')
   if (profile.role === 'editor') redirect('/dashboard/editor')
+    if (profile.role === 'admin') redirect('/dashboard/admin')
   if (profile.role === 'qa') redirect('/dashboard/qa')
 
   redirect('/login')
