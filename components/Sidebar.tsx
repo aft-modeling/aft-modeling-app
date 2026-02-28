@@ -34,6 +34,7 @@ export default function Sidebar({ profile }: SidebarProps) {
         { href: '/dashboard/admin',              icon: LayoutDashboard, label: 'Pipeline Overview' },
         { href: '/dashboard/admin?tab=editors',  icon: Users,           label: 'Editor Portals' },
         { href: '/dashboard/admin?tab=manage',   icon: Shield,          label: 'Manage Editors' },
+        { href: '/dashboard/admin?tab=cd',       icon: Film,            label: 'Creative Director' },
       ]
     : profile.role === 'creative_director'
     ? [
