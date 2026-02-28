@@ -8,6 +8,7 @@ import {
   LayoutDashboard, Film, CheckSquare, Trophy,
   LogOut, User, ChevronRight, Shield, Users
 } from 'lucide-react'
+import NotificationBell from '@/components/NotificationBell'
 
 interface SidebarProps { profile: Profile }
 
@@ -98,6 +99,9 @@ export default function Sidebar({ profile }: SidebarProps) {
       </nav>
 
       {/* User */}
+      <div className="px-3 py-2">
+        <NotificationBell userId={profile.id} />
+      </div>
       <div className="px-3 py-4 border-t border-gray-100">
         <div className="flex items-center gap-3 px-3 py-2">
           <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
