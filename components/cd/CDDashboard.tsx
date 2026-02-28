@@ -1,9 +1,10 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import StatusBadge from '@/components/StatusBadge'
 import AddClipModal from '@/components/cd/AddClipModal'
 import EditClipModal from '@/components/cd/EditClipModal'
-import { Film, Plus, TrendingUp, Clock, CheckCircle, AlertCircle, Trophy, Pencil } from 'lucide-react'
+import { Film, Plus, TrendingUp, Clock, CheckCircle, AlertCircle, Trophy, Pencil, Trash2 } from 'lucide-react'
 
 interface CDDashboardProps {
   clips: any[]
@@ -23,6 +24,27 @@ const COLUMNS = [
 export default function CDDashboard({ clips, editors, finishedClips }: CDDashboardProps) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingClip, setEditingClip] = useState<any>(null)
+  const router = useRouter()
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  async function handleDeleteClip(clipId: string, clipName: string) {
+    if (!confirm(`Are you sure you want to delete "${clipName}"? This will remove all submissions, reviews, and files. This cannot be undone.`)) return
+    setDeleting(clipId)
+    try {
+      const res = await fetch('/api/clips/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clipId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete clip')
+      router.refresh()
+    } catch (err: any) {
+      alert('Delete failed: ' + err.message)
+    } finally {
+      setDeleting(null)
+    }
+  }
   const [selectedEditor, setSelectedEditor] = useState('all')
 
   const filtered = selectedEditor === 'all'
@@ -114,6 +136,18 @@ export default function CDDashboard({ clips, editors, finishedClips }: CDDashboa
                       title="Edit clip"
                     >
                       <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteClip(clip.id, clip.name); }}
+                      className="ml-1 p-1 text-gray-400 hover:text-red-600 rounded"
+                      title="Delete clip"
+                      disabled={deleting === clip.id}
+                    >
+                      {deleting === clip.id ? (
+                        <span className="inline-block w-3.5 h-3.5 border-2 border-red-300 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
                     </button></p>
                     </div>
                     {clip.assigned_editor && (
@@ -131,7 +165,7 @@ export default function CDDashboard({ clips, editors, finishedClips }: CDDashboa
                       {clip.example_reel_url && (
                         <a href={clip.example_reel_url} target="_blank" rel="noopener noreferrer"
                           className="text-xs text-brand-600 hover:text-brand-700 font-medium">
-                          Example â
+                          Example Ã¢ÂÂ
                         </a>
                       )}
                     </div>
