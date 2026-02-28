@@ -34,12 +34,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
 
-      const formData = await req.formData()
-      const file = formData.get('file') as File | null
-      const clipId = formData.get('clipId') as string
-      const clipName = formData.get('clipName') as string
-      const editorId = formData.get('editorId') as string
-      const driveUsedContentLink = formData.get('driveUsedContentLink') as string
+      // Accept JSON body (file already uploaded directly to Supabase Storage from client)
+      const body = await req.json()
+      const { clipId, clipName, editorId, driveUsedContentLink, storagePath, fileUrl } = body
 
       if (!clipId) {
         return NextResponse.json({ error: 'Missing clip ID' }, { status: 400 })
@@ -57,39 +54,6 @@ export async function POST(req: NextRequest) {
         .eq('clip_id', clipId)
       const round = (count || 0) + 1
 
-      let fileUrl = null
-      let storagePath = null
-
-      if (file && file.size > 0) {
-        const editorName = editor?.full_name || 'unknown'
-        const safeName = editorName.replace(/[^a-zA-Z0-9]/g, '_')
-        const safeClipName = (clipName || 'clip').replace(/[^a-zA-Z0-9]/g, '_')
-        const ext = file.name.split('.').pop() || 'mp4'
-        storagePath = safeName + '/' + safeClipName + '/round_' + round + '.' + ext
-
-        const buffer = Buffer.from(await file.arrayBuffer())
-
-        const { error: uploadError } = await supabaseAdmin.storage
-          .from('clip-submissions')
-          .upload(storagePath, buffer, {
-            contentType: file.type,
-            upsert: true,
-          })
-
-        if (uploadError) {
-          console.error('Storage upload error:', uploadError)
-          return NextResponse.json(
-            { error: 'File upload failed: ' + uploadError.message },
-            { status: 500 }
-          )
-        }
-
-        const { data: urlData } = supabaseAdmin.storage
-          .from('clip-submissions')
-          .getPublicUrl(storagePath)
-        fileUrl = urlData.publicUrl
-      }
-
       const { error: subError } = await supabaseAdmin
         .from('submissions')
         .insert({
@@ -105,29 +69,30 @@ export async function POST(req: NextRequest) {
       if (subError) {
         console.error('Submission insert error:', subError)
         return NextResponse.json(
-          { error: 'Failed to create submission' },
+          { error: 'Failed to create submission: ' + subError.message },
           { status: 500 }
         )
       }
 
+      // Update clip status
       await supabaseAdmin
         .from('clips')
-        .update({ status: 'in_qa', updated_at: new Date().toISOString() })
+        .update({ status: 'submitted' })
         .eq('id', clipId)
 
-      return NextResponse.json({ success: true, round, fileUrl })
+      return NextResponse.json({ success: true, round })
 
     } catch (innerError: any) {
-      console.error('submit-clip error:', innerError)
+      console.error('Submit clip inner error:', innerError)
       return NextResponse.json(
-        { error: innerError.message },
+        { error: innerError.message || 'Internal error' },
         { status: 500 }
       )
     }
-  } catch (outerError: any) {
-    console.error('submit-clip outer error:', outerError)
+  } catch (error: any) {
+    console.error('Submit clip error:', error)
     return NextResponse.json(
-      { error: 'Server error' },
+      { error: error.message || 'Server error' },
       { status: 500 }
     )
   }
