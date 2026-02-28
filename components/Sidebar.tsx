@@ -6,7 +6,7 @@ import type { Profile } from '@/lib/types'
 import clsx from 'clsx'
 import {
   LayoutDashboard, Film, CheckSquare, Trophy,
-  LogOut, User, ChevronRight
+  LogOut, User, ChevronRight, Shield, Users
 } from 'lucide-react'
 
 interface SidebarProps { profile: Profile }
@@ -26,22 +26,29 @@ export default function Sidebar({ profile }: SidebarProps) {
     creative_director: 'Creative Director',
     editor: 'Editor',
     qa: 'QA Reviewer',
+    admin: 'Admin',
   }[profile.role]
 
-  const links = profile.role === 'creative_director'
+  const links = profile.role === 'admin'
     ? [
-        { href: '/dashboard/cd',       icon: LayoutDashboard, label: 'Pipeline Overview' },
-        { href: '/dashboard/cd/clips', icon: Film,            label: 'Manage Clips' },
-        { href: '/dashboard/cd/finished', icon: Trophy,       label: 'Finished Clips' },
+        { href: '/dashboard/admin',              icon: LayoutDashboard, label: 'Pipeline Overview' },
+        { href: '/dashboard/admin?tab=editors',  icon: Users,           label: 'Editor Portals' },
+        { href: '/dashboard/admin?tab=manage',   icon: Shield,          label: 'Manage Editors' },
+      ]
+    : profile.role === 'creative_director'
+    ? [
+        { href: '/dashboard/cd',            icon: LayoutDashboard, label: 'Pipeline Overview' },
+        { href: '/dashboard/cd/clips',      icon: Film,            label: 'Manage Clips' },
+        { href: '/dashboard/cd/finished',   icon: Trophy,          label: 'Finished Clips' },
       ]
     : profile.role === 'editor'
     ? [
-        { href: '/dashboard/editor',          icon: LayoutDashboard, label: 'My Assignments' },
-        { href: '/dashboard/editor/history',  icon: Film,            label: 'Submission History' },
+        { href: '/dashboard/editor',            icon: LayoutDashboard, label: 'My Assignments' },
+        { href: '/dashboard/editor/history',    icon: Film,            label: 'Submission History' },
       ]
     : [
-        { href: '/dashboard/qa',              icon: LayoutDashboard, label: 'Review Queue' },
-        { href: '/dashboard/qa/history',      icon: CheckSquare,     label: 'Review History' },
+        { href: '/dashboard/qa',            icon: LayoutDashboard, label: 'Review Queue' },
+        { href: '/dashboard/qa/history',    icon: CheckSquare,     label: 'Review History' },
       ]
 
   return (
@@ -79,27 +86,30 @@ export default function Sidebar({ profile }: SidebarProps) {
                 : 'text-gray-400 group-hover:text-gray-600'
             )} />
             <span className="flex-1">{label}</span>
-            {(pathname === href || pathname.startsWith(href + '/')) && (
-              <ChevronRight className="w-3 h-3 text-brand-400" />
-            )}
+            <ChevronRight className={clsx(
+              'w-3.5 h-3.5',
+              pathname === href || pathname.startsWith(href + '/')
+                ? 'text-brand-400'
+                : 'text-gray-300 group-hover:text-gray-400'
+            )} />
           </Link>
         ))}
       </nav>
 
       {/* User */}
-      <div className="px-3 py-3 border-t border-gray-100 space-y-0.5">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
-          <div className="w-7 h-7 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
-            <User className="w-3.5 h-3.5 text-brand-600" />
+      <div className="px-3 py-4 border-t border-gray-100">
+        <div className="flex items-center gap-3 px-3 py-2">
+          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+            <User className="w-4 h-4 text-gray-500" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate">{profile.full_name}</p>
-            <p className="text-xs text-gray-400 truncate">{roleLabel}</p>
+            <p className="text-sm font-medium text-gray-900 truncate">{profile.full_name}</p>
+            <p className="text-xs text-gray-500 truncate">{roleLabel}</p>
           </div>
         </div>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+          className="mt-2 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors w-full"
         >
           <LogOut className="w-4 h-4 text-gray-400" />
           Sign out
