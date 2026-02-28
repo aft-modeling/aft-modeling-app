@@ -102,6 +102,24 @@ export async function POST(req: NextRequest) {
                 .update({ status: 'finished', updated_at: new Date().toISOString() })
                 .eq('id', clipId)
 
+      // Notify creative director(s) about approved clip
+      const { data: cdUsers } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'creative_director')
+
+      if (cdUsers && cdUsers.length > 0) {
+        const { data: clipInfo } = await supabase.from('clips').select('name').eq('id', clipId).single()
+        await supabase.from('notifications').insert(
+          cdUsers.map((cd: any) => ({
+            user_id: cd.id,
+            message: `Clip "${clipInfo?.name || 'Unknown'}" has been approved by QA`,
+            type: 'clip_approved',
+            clip_id: clipId,
+          }))
+        )
+      }
+
       } else {
               // =============================================
             // REVISION FLOW
@@ -113,8 +131,19 @@ export async function POST(req: NextRequest) {
                 .update({ status: 'needs_revision', updated_at: new Date().toISOString() })
                 .eq('id', clipId)
 
+      // Notify editor about denied clip / revision needed
+      if (editorId) {
+        const { data: clipInfo2 } = await supabase.from('clips').select('name').eq('id', clipId).single()
+        await supabase.from('notifications').insert({
+          user_id: editorId,
+          message: `Clip "${clipInfo2?.name || 'Unknown'}" needs revision: ${qa_notes || 'No notes provided'}`,
+          type: 'revision_needed',
+          clip_id: clipId,
+        })
+      }
+
             // The editor will see this in their dashboard and resubmit
-            // No duplicate records — same clip record is reused
+            // No duplicate records â same clip record is reused
       }
 
       return NextResponse.json({ success: true, review })
