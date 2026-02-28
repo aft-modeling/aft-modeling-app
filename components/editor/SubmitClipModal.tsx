@@ -2,6 +2,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, Upload, File, ExternalLink } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 interface SubmitClipModalProps {
   clip: any
@@ -11,12 +12,14 @@ interface SubmitClipModalProps {
 
 export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipModalProps) {
   const router = useRouter()
+  const supabase = createClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [driveUsedContentLink, setDriveUsedContentLink] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
 
   function handleFileDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -31,18 +34,60 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
     setError('')
 
     try {
-      const formData = new FormData()
-      if (file) {
-        formData.append('file', file)
-      }
-      formData.append('clipId', clip.id)
-      formData.append('clipName', clip.name)
-      formData.append('editorId', editorId)
-      formData.append('driveUsedContentLink', driveUsedContentLink)
+      let storagePath: string | null = null
+      let fileUrl: string | null = null
 
+      // Upload file directly to Supabase Storage from client (bypasses Vercel 4.5MB limit)
+      if (file && file.size > 0) {
+        setUploadProgress('Uploading video...')
+
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
+
+        const safeName = editorId.substring(0, 8)
+        const safeClipName = (clip.name || 'clip').replace(/[^a-zA-Z0-9]/g, '_')
+        const ext = file.name.split('.').pop() || 'mp4'
+
+        // Get submission round
+        const { count } = await supabase
+          .from('submissions')
+          .select('*', { count: 'exact', head: true })
+          .eq('clip_id', clip.id)
+        const round = (count || 0) + 1
+
+        storagePath = safeName + '/' + safeClipName + '/round_' + round + '.' + ext
+
+        const { error: uploadError } = await supabase.storage
+          .from('clip-submissions')
+          .upload(storagePath, file, {
+            contentType: file.type,
+            upsert: true,
+          })
+
+        if (uploadError) {
+          throw new Error('File upload failed: ' + uploadError.message)
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('clip-submissions')
+          .getPublicUrl(storagePath)
+        fileUrl = urlData.publicUrl
+
+        setUploadProgress('Saving submission...')
+      }
+
+      // Send only metadata to API (no large file in request body)
       const res = await fetch('/api/submit-clip', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clipId: clip.id,
+          clipName: clip.name,
+          editorId,
+          driveUsedContentLink,
+          storagePath,
+          fileUrl,
+        }),
       })
 
       if (!res.ok) {
@@ -54,7 +99,9 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
       onClose()
     } catch (err: any) {
       setError(err.message)
+    } finally {
       setLoading(false)
+      setUploadProgress('')
     }
   }
 
@@ -93,39 +140,40 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* File Upload (Optional) */}
+          {/* File Upload */}
           <div>
             <label className="label">Upload Video File (Optional)</label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="video/*,.mp4,.mov,.avi"
-              className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleFileDrop}
               onClick={() => fileRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-                dragOver ? 'border-brand-400 bg-brand-50' : 'border-gray-200 hover:border-brand-300 hover:bg-gray-50'
+              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                dragOver ? 'border-brand-400 bg-brand-50' :
+                file ? 'border-green-300 bg-green-50' :
+                'border-gray-200 hover:border-gray-300'
               }`}
             >
+              <input
+                ref={fileRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
               {file ? (
-                <div className="flex items-center justify-center gap-3">
-                  <File className="w-6 h-6 text-brand-600" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                <div className="flex items-center justify-center gap-2">
+                  <File className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <p className="text-sm font-medium">{file.name}</p>
                     <p className="text-xs text-gray-500">{formatBytes(file.size)}</p>
                   </div>
                 </div>
               ) : (
                 <div>
                   <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm font-medium text-gray-600">Drop your video file here</p>
-                  <p className="text-xs text-gray-400 mt-1">or click to browse</p>
-                  <p className="text-xs text-gray-400 mt-1">MP4, MOV, AVI supported</p>
+                  <p className="text-sm text-gray-500">Drop your video here or click to browse</p>
+                  <p className="text-xs text-gray-400 mt-1">Supports large video files</p>
                 </div>
               )}
             </div>
@@ -138,7 +186,7 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
               className="input"
               placeholder="https://drive.google.com/..."
               value={driveUsedContentLink}
-              onChange={e => setDriveUsedContentLink(e.target.value)}
+              onChange={(e) => setDriveUsedContentLink(e.target.value)}
             />
             <p className="text-xs text-gray-400 mt-1">Link to the raw footage/assets you used</p>
           </div>
@@ -146,6 +194,13 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">
               {error}
+            </div>
+          )}
+
+          {uploadProgress && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-700 text-sm px-3 py-2 rounded-lg flex items-center gap-2">
+              <span className="inline-block w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin" />
+              {uploadProgress}
             </div>
           )}
 
