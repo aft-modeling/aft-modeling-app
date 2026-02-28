@@ -80,15 +80,17 @@ export async function POST(req: NextRequest) {
         .update({ status: 'submitted' })
         .eq('id', clipId)
 
+    console.log('[NOTIFY] Starting QA notification...')
       // Notify all QA users about new submission
       const { data: qaUsers } = await supabaseAdmin
         .from('profiles')
         .select('id')
         .eq('role', 'qa')
+    console.log('[NOTIFY] QA users found:', JSON.stringify(qaUsers))
 
       if (qaUsers && qaUsers.length > 0) {
         const editorName = editor?.full_name || 'An editor'
-        await supabaseAdmin.from('notifications').insert(
+      const { error: notifError } = await supabaseAdmin.from('notifications').insert(
           qaUsers.map((qa: any) => ({
             user_id: qa.id,
             message: `${editorName} submitted "${clipName || 'a clip'}" for QA review (Round ${round})`,
@@ -96,6 +98,8 @@ export async function POST(req: NextRequest) {
             clip_id: clipId,
           }))
         )
+      if (notifError) console.error('[NOTIFY] Insert error:', notifError)
+      else console.log('[NOTIFY] Notifications inserted successfully')
       }
 
       return NextResponse.json({ success: true, round })
