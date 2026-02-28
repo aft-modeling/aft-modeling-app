@@ -80,6 +80,24 @@ export async function POST(req: NextRequest) {
         .update({ status: 'submitted' })
         .eq('id', clipId)
 
+      // Notify all QA users about new submission
+      const { data: qaUsers } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('role', 'qa')
+
+      if (qaUsers && qaUsers.length > 0) {
+        const editorName = editor?.full_name || 'An editor'
+        await supabaseAdmin.from('notifications').insert(
+          qaUsers.map((qa: any) => ({
+            user_id: qa.id,
+            message: `${editorName} submitted "${clipName || 'a clip'}" for QA review (Round ${round})`,
+            type: 'submission_reviewed',
+            clip_id: clipId,
+          }))
+        )
+      }
+
       return NextResponse.json({ success: true, round })
 
     } catch (innerError: any) {
@@ -97,3 +115,4 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+h
