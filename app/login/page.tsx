@@ -1,7 +1,9 @@
 'use client'
+
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -15,7 +17,9 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+
     const { error } = await supabase.auth.signInWithPassword({ email, password })
+
     if (error) {
       setError(error.message)
       setLoading(false)
@@ -26,55 +30,68 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/10 rounded-2xl backdrop-blur mb-4">
-            <span className="text-2xl font-bold text-white">AFT</span>
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/logo.png"
+              alt="AFT Modeling"
+              width={160}
+              height={160}
+              className="rounded-xl"
+              priority
+            />
           </div>
-          <h1 className="text-white text-2xl font-bold">AFT Modeling</h1>
-          <p className="text-brand-300 text-sm mt-1">Content Workflow Portal</p>
         </div>
 
         {/* Card */}
-        <div className="card p-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-5">Sign in to your account</h2>
+
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="label">Email address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
               <input
                 type="email"
-                className="input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all placeholder:text-gray-400"
                 placeholder="you@aftmodeling.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
               />
             </div>
+
             <div>
-              <label className="label">Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
               <input
                 type="password"
-                className="input"
-                placeholder="••••••••"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all placeholder:text-gray-400"
+                placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
               />
             </div>
+
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">
                 {error}
               </div>
             )}
-            <button type="submit" className="btn-primary w-full justify-center" disabled={loading}>
+
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg font-medium text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-black text-white hover:bg-gray-800 focus:ring-gray-900"
+              disabled={loading}
+            >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-brand-300 text-xs mt-6">
+        <p className="text-center text-gray-500 text-xs mt-6">
           Contact your administrator to get access.
         </p>
       </div>
