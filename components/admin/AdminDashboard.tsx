@@ -34,6 +34,7 @@ function isOverdue(dueDate: string | null, status: string): boolean {
   due.setHours(0, 0, 0, 0)
   return due < today
 }
+
 export default function AdminDashboard({ clips, profiles, submissions, finishedClips }: AdminDashboardProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -45,14 +46,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const [error, setError] = useState('')
   const [selectedEditor, setSelectedEditor] = useState<string>('')
   const [deleting, setDeleting] = useState<string | null>(null)
-
-      {detailClip && (
-        <ClipDetailModal
-          clipId={detailClip.id}
-          onClose={() => setDetailClip(null)}
-        />
-      )}
-
+  const [detailClip, setDetailClip] = useState<any>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingClip, setEditingClip] = useState<any>(null)
   const [cdEditorFilter, setCdEditorFilter] = useState('all')
@@ -123,6 +117,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
       setDeleting(null)
     }
   }
+
   return (
     <div className="flex-1 overflow-auto">
       <div className="p-6">
@@ -142,7 +137,9 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
               onClick={() => setTab(tab.id)}
               className={clsx(
                 'px-4 py-2 rounded-md text-sm font-medium transition-colors',
-                currentTab === tab.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                currentTab === tab.id
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
               )}
             >
               {tab.label}
@@ -156,8 +153,13 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {STATUS_COLUMNS.map(col => {
                 const colClips = col.status === 'finished'
-                  ? finishedClips.map(fc => ({ ...fc, status: 'finished' as ClipStatus, assigned_editor: profiles.find(p => p.id === (clips.find(c => c.name === fc.clip_name)?.assigned_editor_id)) }))
+                  ? finishedClips.map(fc => ({
+                      ...fc,
+                      status: 'finished' as ClipStatus,
+                      assigned_editor: profiles.find(p => p.id === (clips.find(c => c.name === fc.clip_name)?.assigned_editor_id))
+                    }))
                   : clips.filter(c => c.status === col.status)
+
                 return (
                   <div key={col.status} className="bg-white rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -171,11 +173,24 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                         <p className="text-xs text-gray-400 text-center py-4">No clips</p>
                       )}
                       {colClips.map((clip: any) => (
-                        <div key={clip.id} className={clsx('p-3 rounded-lg border', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')} onClick={() => setDetailClip(clip)} style={{cursor:"pointer"}}>
+                        <div
+                          key={clip.id}
+                          className={clsx('p-3 rounded-lg border cursor-pointer', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')}
+                          onClick={() => setDetailClip(clip)}
+                        >
                           <div className="flex items-start justify-between gap-1">
                             <p className="text-sm font-medium text-gray-900 truncate">{clip.name || clip.clip_name}</p>
-                            <button onClick={() => handleDeleteClip(clip.id, clip.name || clip.clip_name)} className="p-1 text-gray-400 hover:text-red-600 rounded flex-shrink-0" title="Delete clip" disabled={deleting === clip.id}>
-                              {deleting === clip.id ? (<span className="inline-block w-3.5 h-3.5 border-2 border-red-300 border-t-transparent rounded-full animate-spin" />) : (<Trash2 size={14} />)}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteClip(clip.id, clip.name || clip.clip_name); }}
+                              className="p-1 text-gray-400 hover:text-red-600 rounded flex-shrink-0"
+                              title="Delete clip"
+                              disabled={deleting === clip.id}
+                            >
+                              {deleting === clip.id ? (
+                                <span className="inline-block w-3.5 h-3.5 border-2 border-red-300 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 size={14} />
+                              )}
                             </button>
                           </div>
                           {clip.assigned_editor && (
@@ -185,7 +200,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                           )}
                           {clip.due_date && (
                             <p className={clsx('text-xs mt-1', isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-400')}>
-                              {isOverdue(clip.due_date, clip.status) ? '\u26a0 Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
+                              {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
                             </p>
                           )}
                         </div>
@@ -203,7 +218,11 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
           <div className="space-y-4">
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Select an Editor</label>
-              <select value={selectedEditor} onChange={e => setSelectedEditor(e.target.value)} className="w-full max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <select
+                value={selectedEditor}
+                onChange={e => setSelectedEditor(e.target.value)}
+                className="w-full max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
                 <option value="">-- Choose Editor --</option>
                 {editors.map(editor => (
                   <option key={editor.id} value={editor.id}>{editor.full_name} ({editor.email})</option>
@@ -221,11 +240,15 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                     <p className="text-sm text-gray-500">No clips assigned to this editor.</p>
                   )}
                   {clips.filter(c => c.assigned_editor_id === selectedEditor).map(clip => (
-                    <div key={clip.id} className={clsx('flex items-center justify-between p-3 rounded-lg border', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')} onClick={() => setDetailClip(clip)} style={{cursor:"pointer"}}>
+                    <div
+                      key={clip.id}
+                      className={clsx('flex items-center justify-between p-3 rounded-lg border cursor-pointer', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')}
+                      onClick={() => setDetailClip(clip)}
+                    >
                       <div>
                         <p className="text-sm font-medium text-gray-900">{clip.name}</p>
                         <p className={clsx('text-xs', isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-500')}>
-                          {isOverdue(clip.due_date, clip.status) ? '\u26a0 Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
+                          {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
                         </p>
                       </div>
                       <span className={clsx(
@@ -251,7 +274,10 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
 
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-900">Editor Accounts</h3>
-              <button onClick={() => setShowAddEditor(true)} className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors">
+              <button
+                onClick={() => setShowAddEditor(true)}
+                className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors"
+              >
                 + Add New Editor
               </button>
             </div>
@@ -262,21 +288,50 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                 <form onSubmit={handleCreateEditor} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                    <input type="text" required value={newEditor.full_name} onChange={e => setNewEditor(prev => ({ ...prev, full_name: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Editor Name" />
+                    <input
+                      type="text"
+                      required
+                      value={newEditor.full_name}
+                      onChange={e => setNewEditor(prev => ({ ...prev, full_name: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      placeholder="Editor Name"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input type="email" required value={newEditor.email} onChange={e => setNewEditor(prev => ({ ...prev, email: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="editor@aftmodeling.com" />
+                    <input
+                      type="email"
+                      required
+                      value={newEditor.email}
+                      onChange={e => setNewEditor(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      placeholder="editor@aftmodeling.com"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <input type="text" required value={newEditor.password} onChange={e => setNewEditor(prev => ({ ...prev, password: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Initial password" />
+                    <input
+                      type="text"
+                      required
+                      value={newEditor.password}
+                      onChange={e => setNewEditor(prev => ({ ...prev, password: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      placeholder="Initial password"
+                    />
                   </div>
                   <div className="flex gap-3">
-                    <button type="submit" disabled={loading} className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+                    >
                       {loading ? 'Creating...' : 'Create Editor'}
                     </button>
-                    <button type="button" onClick={() => setShowAddEditor(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddEditor(false)}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -307,7 +362,11 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                         {new Date(editor.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => handleRemoveEditor(editor.id)} disabled={loading} className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50">
+                        <button
+                          onClick={() => handleRemoveEditor(editor.id)}
+                          disabled={loading}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
+                        >
                           Remove
                         </button>
                       </td>
@@ -335,7 +394,8 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                 <p className="text-sm text-gray-500">Track all clips across your content workflow</p>
               </div>
               <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2">
-                <Plus size={16} /> New Clip
+                <Plus size={16} />
+                New Clip
               </button>
             </div>
 
@@ -359,9 +419,16 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
 
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-600">Filter by editor:</span>
-              <button onClick={() => setCdEditorFilter('all')} className={`px-3 py-1 text-sm rounded-full ${cdEditorFilter === 'all' ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>All</button>
+              <button
+                onClick={() => setCdEditorFilter('all')}
+                className={`px-3 py-1 text-sm rounded-full ${cdEditorFilter === 'all' ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >All</button>
               {editors.map(e => (
-                <button key={e.id} onClick={() => setCdEditorFilter(e.id)} className={`px-3 py-1 text-sm rounded-full ${cdEditorFilter === e.id ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{e.full_name}</button>
+                <button
+                  key={e.id}
+                  onClick={() => setCdEditorFilter(e.id)}
+                  className={`px-3 py-1 text-sm rounded-full ${cdEditorFilter === e.id ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >{e.full_name}</button>
               ))}
             </div>
 
@@ -377,6 +444,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                 const colClips = col.key === 'in_qa'
                   ? fClips.filter(x => x.status === 'in_qa' || x.status === 'submitted')
                   : fClips.filter(x => x.status === col.key)
+
                 return (
                   <div key={col.key} className="space-y-2">
                     <div className={`card px-3 py-2.5 border-t-2 ${col.color} flex items-center justify-between`}>
@@ -389,8 +457,17 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                         <div key={clip.id} className={`card p-3 space-y-2 hover:shadow-md transition-shadow ${isOverdue(clip.due_date, clip.status) ? 'ring-2 ring-red-300 bg-red-50/30' : ''}`}>
                           <div className="flex items-start justify-between gap-1">
                             <p className="text-sm font-medium text-gray-900 leading-tight">{clip.name}
-                              <button onClick={(e) => { e.stopPropagation(); setEditingClip(clip); }} className="ml-2 p-1 text-gray-400 hover:text-indigo-600 rounded" title="Edit clip"><Pencil size={14} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDeleteClip(clip.id, clip.name); }} className="ml-1 p-1 text-gray-400 hover:text-red-600 rounded" title="Delete clip" disabled={deleting === clip.id}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingClip(clip); }}
+                                className="ml-2 p-1 text-gray-400 hover:text-indigo-600 rounded"
+                                title="Edit clip"
+                              ><Pencil size={14} /></button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteClip(clip.id, clip.name); }}
+                                className="ml-1 p-1 text-gray-400 hover:text-red-600 rounded"
+                                title="Delete clip"
+                                disabled={deleting === clip.id}
+                              >
                                 {deleting === clip.id ? <span className="inline-block w-3.5 h-3.5 border-2 border-red-300 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
                               </button>
                             </p>
@@ -405,7 +482,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                           )}
                           <div className="flex items-center justify-between">
                             <span className={`text-xs ${isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
-                              {isOverdue(clip.due_date, clip.status) ? '\u26a0 Overdue: ' : 'Due: '}{clip.due_date}
+                              {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{clip.due_date}
                             </span>
                             {clip.example_reel_url && <a href={clip.example_reel_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:underline">Example</a>}
                           </div>
@@ -421,7 +498,16 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
             {editingClip && <EditClipModal clip={editingClip} editors={editors} onClose={() => setEditingClip(null)} />}
           </div>
         )}
+
+        {/* Clip Detail Modal */}
+        {detailClip && (
+          <ClipDetailModal
+            clipId={detailClip.id}
+            onClose={() => setDetailClip(null)}
+          />
+        )}
       </div>
     </div>
   )
 }
+
