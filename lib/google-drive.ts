@@ -114,3 +114,35 @@ export async function moveFileToDateFolder(fileId: string, editorName: string): 
 
   return updated.data.webViewLink || ''
 }
+
+// Extract Google Drive file ID from a webViewLink URL
+// e.g. "https://drive.google.com/file/d/ABC123/view?usp=drivesdk" â "ABC123"
+function extractDriveFileId(driveViewLink: string): string | null {
+  const match = driveViewLink.match(/\/file\/d\/([^/]+)/)
+  return match ? match[1] : null
+}
+
+// Delete a file from Google Drive given its webViewLink
+// Best-effort: won't throw if file is already gone
+export async function deleteFileFromDrive(driveViewLink: string): Promise<void> {
+  const fileId = extractDriveFileId(driveViewLink)
+  if (!fileId) {
+    console.warn('Could not extract Drive file ID from:', driveViewLink)
+    return
+  }
+
+  const drive = getDriveClient()
+  try {
+    await drive.files.delete({
+      fileId,
+      supportsAllDrives: true,
+    })
+  } catch (err: any) {
+    // 404 means file already deleted â that's fine
+    if (err?.code === 404 || err?.status === 404) {
+      console.warn('Drive file already deleted:', fileId)
+    } else {
+      console.error('Failed to delete Drive file:', fileId, err)
+    }
+  }
+}
