@@ -49,9 +49,9 @@ function getDateFolderNames(date: Date): { monthYear: string; monthDay: string }
   }
 }
 
-// Upload a finished clip to Google Drive
+// Upload a file buffer to Google Drive
 // Folder structure: Root / {editorName} / {Month Year} / {Month Day} / file
-export async function uploadFinishedClipToDrive(
+export async function uploadFileToDrive(
   buffer: Buffer,
   filename: string,
   mimeType: string,
@@ -90,4 +90,32 @@ export async function uploadFinishedClipToDrive(
     id: file.data.id!,
     webViewLink: file.data.webViewLink!,
   }
+}
+
+// Move an existing Drive file to the date-based folder structure
+// Used when a clip is approved/finished - moves from submission folder to:
+// Root / {editorName} / {Month Year} / {Month Day}
+export async function moveFileToDateFolder(fileId: string, editorName: string): Promise<string> {
+  const drive = getDriveClient()
+  const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!
+  const { monthYear, monthDay } = getDateFolderNames(new Date())
+
+  // Create date-based folder structure
+  const editorFolderId = await getOrCreateFolder(editorName, rootFolderId)
+  const monthFolderId = await getOrCreateFolder(monthYear, editorFolderId)
+  const dayFolderId = await getOrCreateFolder(monthDay, monthFolderId)
+
+  // Get current parents so we can remove them
+  const file = await drive.files.get({ fileId, fields: 'parents' })
+  const previousParents = file.data.parents?.join(',') || ''
+
+  // Move file to the new date-based folder
+  const updated = await drive.files.update({
+    fileId,
+    addParents: dayFolderId,
+    removeParents: previousParents,
+    fields: 'id, parents, webViewLink',
+  })
+
+  return updated.data.webViewLink || ''
 }
