@@ -26,6 +26,12 @@ const STATUS_COLUMNS: { status: ClipStatus; label: string; color: string }[] = [
   { status: 'finished', label: 'Finished', color: 'bg-emerald-100 text-emerald-800' },
 ]
 
+const MANAGEABLE_ROLES = [
+  { key: 'editor', label: 'Editors', singular: 'Editor', removeWarning: 'Their clips will be unassigned.' },
+  { key: 'creative_director', label: 'Creative Directors', singular: 'Creative Director', removeWarning: 'Clips they created will remain in the system.' },
+  { key: 'qa', label: 'QA Analysts', singular: 'QA Analyst', removeWarning: 'Their reviews will be preserved.' },
+] as const
+
 function isOverdue(dueDate: string | null, status: string): boolean {
   if (!dueDate || status === 'finished' || status === 'approved') return false
   const due = new Date(dueDate)
@@ -40,8 +46,10 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab') || 'pipeline'
 
-  const [showAddEditor, setShowAddEditor] = useState(false)
-  const [newEditor, setNewEditor] = useState({ full_name: '', email: '', password: '' })
+  // Manage Team state
+  const [managingRole, setManagingRole] = useState<string>('editor')
+  const [showAddUser, setShowAddUser] = useState(false)
+  const [newUser, setNewUser] = useState({ full_name: '', email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [selectedEditor, setSelectedEditor] = useState<string>('')
@@ -52,26 +60,28 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const [cdEditorFilter, setCdEditorFilter] = useState('all')
 
   const editors = profiles.filter(p => p.role === 'editor')
+  const currentRoleConfig = MANAGEABLE_ROLES.find(r => r.key === managingRole)!
+  const currentRoleUsers = profiles.filter(p => p.role === managingRole)
 
   function setTab(tab: string) {
     const url = tab === 'pipeline' ? '/dashboard/admin' : `/dashboard/admin?tab=${tab}`
     router.push(url)
   }
 
-  async function handleCreateEditor(e: React.FormEvent) {
+  async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/admin/create-editor', {
+      const res = await fetch('/api/admin/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEditor),
+        body: JSON.stringify({ ...newUser, role: managingRole }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to create editor')
-      setNewEditor({ full_name: '', email: '', password: '' })
-      setShowAddEditor(false)
+      if (!res.ok) throw new Error(data.error || 'Failed to create user')
+      setNewUser({ full_name: '', email: '', password: '' })
+      setShowAddUser(false)
       router.refresh()
     } catch (err: any) {
       setError(err.message)
@@ -80,17 +90,19 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
     }
   }
 
-  async function handleRemoveEditor(editorId: string) {
-    if (!confirm('Are you sure you want to remove this editor? Their clips will be unassigned.')) return
+  async function handleRemoveUser(userId: string, userName: string, role: string) {
+    const roleConfig = MANAGEABLE_ROLES.find(r => r.key === role)
+    const warning = roleConfig ? roleConfig.removeWarning : ''
+    if (!confirm(`Are you sure you want to remove ${userName}? ${warning}`)) return
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/remove-editor', {
+      const res = await fetch('/api/admin/remove-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ editorId }),
+        body: JSON.stringify({ userId, role }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to remove editor')
+      if (!res.ok) throw new Error(data.error || 'Failed to remove user')
       router.refresh()
     } catch (err: any) {
       setError(err.message)
@@ -129,7 +141,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
           {[
             { id: 'pipeline', label: 'Pipeline Overview' },
             { id: 'editors', label: 'Editor Portals' },
-            { id: 'manage', label: 'Manage Editors' },
+            { id: 'manage', label: 'Manage Team' },
             { id: 'cd', label: 'Creative Director' },
           ].map(tab => (
             <button
@@ -265,36 +277,54 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
           </div>
         )}
 
-        {/* Manage Editors Tab */}
+        {/* Manage Team Tab */}
         {currentTab === 'manage' && (
           <div className="space-y-4">
             {error && (
               <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
             )}
 
+            {/* Role Selector */}
+            <div className="flex gap-1 bg-gray-50 p-1 rounded-lg w-fit">
+              {MANAGEABLE_ROLES.map(role => (
+                <button
+                  key={role.key}
+                  onClick={() => { setManagingRole(role.key); setShowAddUser(false); setError(''); }}
+                  className={clsx(
+                    'px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                    managingRole === role.key
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  )}
+                >
+                  {role.label} ({profiles.filter(p => p.role === role.key).length})
+                </button>
+              ))}
+            </div>
+
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-900">Editor Accounts</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{currentRoleConfig.singular} Accounts</h3>
               <button
-                onClick={() => setShowAddEditor(true)}
+                onClick={() => setShowAddUser(true)}
                 className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors"
               >
-                + Add New Editor
+                + Add New {currentRoleConfig.singular}
               </button>
             </div>
 
-            {showAddEditor && (
+            {showAddUser && (
               <div className="bg-white rounded-xl border-2 border-brand-200 p-6">
-                <h4 className="text-md font-semibold text-gray-900 mb-4">Create New Editor Account</h4>
-                <form onSubmit={handleCreateEditor} className="space-y-4">
+                <h4 className="text-md font-semibold text-gray-900 mb-4">Create New {currentRoleConfig.singular} Account</h4>
+                <form onSubmit={handleCreateUser} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                     <input
                       type="text"
                       required
-                      value={newEditor.full_name}
-                      onChange={e => setNewEditor(prev => ({ ...prev, full_name: e.target.value }))}
+                      value={newUser.full_name}
+                      onChange={e => setNewUser(prev => ({ ...prev, full_name: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      placeholder="Editor Name"
+                      placeholder={`${currentRoleConfig.singular} Name`}
                     />
                   </div>
                   <div>
@@ -302,10 +332,10 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                     <input
                       type="email"
                       required
-                      value={newEditor.email}
-                      onChange={e => setNewEditor(prev => ({ ...prev, email: e.target.value }))}
+                      value={newUser.email}
+                      onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      placeholder="editor@aftmodeling.com"
+                      placeholder="user@aftmodeling.com"
                     />
                   </div>
                   <div>
@@ -313,8 +343,8 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                     <input
                       type="text"
                       required
-                      value={newEditor.password}
-                      onChange={e => setNewEditor(prev => ({ ...prev, password: e.target.value }))}
+                      value={newUser.password}
+                      onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                       placeholder="Initial password"
                     />
@@ -325,11 +355,11 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                       disabled={loading}
                       className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
                     >
-                      {loading ? 'Creating...' : 'Create Editor'}
+                      {loading ? 'Creating...' : `Create ${currentRoleConfig.singular}`}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowAddEditor(false)}
+                      onClick={() => setShowAddUser(false)}
                       className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
                     >
                       Cancel
@@ -345,25 +375,21 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Clips</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {editors.map(editor => (
-                    <tr key={editor.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{editor.full_name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{editor.email}</td>
+                  {currentRoleUsers.map(user => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{user.full_name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">
-                        {clips.filter(c => c.assigned_editor_id === editor.id).length}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {new Date(editor.created_at).toLocaleDateString()}
+                        {new Date(user.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
-                          onClick={() => handleRemoveEditor(editor.id)}
+                          onClick={() => handleRemoveUser(user.id, user.full_name, managingRole)}
                           disabled={loading}
                           className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
                         >
@@ -372,10 +398,10 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                       </td>
                     </tr>
                   ))}
-                  {editors.length === 0 && (
+                  {currentRoleUsers.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">
-                        No editor accounts found.
+                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
+                        No {currentRoleConfig.label.toLowerCase()} found.
                       </td>
                     </tr>
                   )}
@@ -510,4 +536,3 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
     </div>
   )
 }
-
