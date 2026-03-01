@@ -18,6 +18,8 @@ export async function getOrCreateFolder(name: string, parentId: string): Promise
   const res = await drive.files.list({
     q: `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`,
     fields: 'files(id, name)',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   })
   if (res.data.files && res.data.files.length > 0) {
     return res.data.files[0].id!
@@ -29,17 +31,14 @@ export async function getOrCreateFolder(name: string, parentId: string): Promise
       parents: [parentId],
     },
     fields: 'id',
+    supportsAllDrives: true,
   })
   return folder.data.id!
 }
 
-// Format date for folder names
-// Returns { monthYear: "March 2026", monthDay: "March 1" }
-function getDateFolderNames(date: Date): { monthYear: string; monthDay: string } {
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ]
+// Get month/year and month/day folder names
+function getDateFolderNames(date: Date) {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
   const month = months[date.getMonth()]
   const year = date.getFullYear()
   const day = date.getDate()
@@ -78,12 +77,7 @@ export async function uploadFileToDrive(
       body: stream,
     },
     fields: 'id, webViewLink',
-  })
-
-  // Make the file viewable by anyone with the link
-  await drive.permissions.create({
-    fileId: file.data.id!,
-    requestBody: { role: 'reader', type: 'anyone' },
+    supportsAllDrives: true,
   })
 
   return {
@@ -106,7 +100,7 @@ export async function moveFileToDateFolder(fileId: string, editorName: string): 
   const dayFolderId = await getOrCreateFolder(monthDay, monthFolderId)
 
   // Get current parents so we can remove them
-  const file = await drive.files.get({ fileId, fields: 'parents' })
+  const file = await drive.files.get({ fileId, fields: 'parents', supportsAllDrives: true })
   const previousParents = file.data.parents?.join(',') || ''
 
   // Move file to the new date-based folder
@@ -115,6 +109,7 @@ export async function moveFileToDateFolder(fileId: string, editorName: string): 
     addParents: dayFolderId,
     removeParents: previousParents,
     fields: 'id, parents, webViewLink',
+    supportsAllDrives: true,
   })
 
   return updated.data.webViewLink || ''
