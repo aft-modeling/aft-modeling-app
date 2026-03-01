@@ -32,16 +32,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <img
-              src="/logo.png"
-              alt="AFT Modeling"
-              width={160}
-              height={160}
-              className="rounded-xl"
-            />
-          </div>
+        <div className="flex justify-center mb-8">
+          <img
+            src="/logo.png"
+            alt="AFT Modeling"
+            className="w-48 h-auto rounded-xl"
+          />
         </div>
 
         {/* Card */}
