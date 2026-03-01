@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -35,13 +34,12 @@ export default function LoginPage() {
         {/* Logo / Brand */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Image
+            <img
               src="/logo.png"
               alt="AFT Modeling"
               width={160}
               height={160}
               className="rounded-xl"
-              priority
             />
           </div>
         </div>
@@ -68,7 +66,7 @@ export default function LoginPage() {
               <input
                 type="password"
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all placeholder:text-gray-400"
-                placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
