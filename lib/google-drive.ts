@@ -33,28 +33,45 @@ export async function getOrCreateFolder(name: string, parentId: string): Promise
   return folder.data.id!
 }
 
-// Upload a file buffer to Google Drive
-// Returns { id, webViewLink }
-export async function uploadFileToDrive(
+// Format date for folder names
+// Returns { monthYear: "March 2026", monthDay: "March 1" }
+function getDateFolderNames(date: Date): { monthYear: string; monthDay: string } {
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ]
+  const month = months[date.getMonth()]
+  const year = date.getFullYear()
+  const day = date.getDate()
+  return {
+    monthYear: `${month} ${year}`,
+    monthDay: `${month} ${day}`,
+  }
+}
+
+// Upload a finished clip to Google Drive
+// Folder structure: Root / {editorName} / {Month Year} / {Month Day} / file
+export async function uploadFinishedClipToDrive(
   buffer: Buffer,
   filename: string,
   mimeType: string,
-  editorName: string,
-  clipName: string
+  editorName: string
 ): Promise<{ id: string; webViewLink: string }> {
   const drive = getDriveClient()
   const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!
+  const { monthYear, monthDay } = getDateFolderNames(new Date())
 
-  // Create folder structure: AFT Modeling / {editorName} / {clipName}
+  // Create folder structure: Root / Editor / Month Year / Month Day
   const editorFolderId = await getOrCreateFolder(editorName, rootFolderId)
-  const clipFolderId = await getOrCreateFolder(clipName, editorFolderId)
+  const monthFolderId = await getOrCreateFolder(monthYear, editorFolderId)
+  const dayFolderId = await getOrCreateFolder(monthDay, monthFolderId)
 
   const stream = Readable.from(buffer)
 
   const file = await drive.files.create({
     requestBody: {
       name: filename,
-      parents: [clipFolderId],
+      parents: [dayFolderId],
     },
     media: {
       mimeType,
@@ -73,22 +90,4 @@ export async function uploadFileToDrive(
     id: file.data.id!,
     webViewLink: file.data.webViewLink!,
   }
-}
-
-// Move a file to an "Approved" subfolder
-export async function moveFileToApproved(fileId: string, editorName: string): Promise<void> {
-  const drive = getDriveClient()
-  const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!
-  const editorFolderId = await getOrCreateFolder(editorName, rootFolderId)
-  const approvedFolderId = await getOrCreateFolder('Approved', editorFolderId)
-
-  const file = await drive.files.get({ fileId, fields: 'parents' })
-  const previousParents = file.data.parents?.join(',') || ''
-
-  await drive.files.update({
-    fileId,
-    addParents: approvedFolderId,
-    removeParents: previousParents,
-    fields: 'id, parents',
-  })
 }
