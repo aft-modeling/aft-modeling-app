@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { moveFileToApproved } from '@/lib/google-drive'
+import { moveFileToDateFolder } from '@/lib/google-drive'
 
 export const runtime = 'nodejs'
 
@@ -73,12 +73,12 @@ export async function POST(req: NextRequest) {
                 .eq('id', submissionId)
                 .single()
 
-            // Move file to Approved folder in Drive
+            // Move file to date-based folder in Drive (Editor / Month / Day)
             if (submission?.drive_file_id && submission?.editor?.full_name) {
                       try {
-                                  await moveFileToApproved(submission.drive_file_id, submission.editor.full_name)
+                                  await moveFileToDateFolder(submission.drive_file_id, submission.editor.full_name)
                       } catch (driveErr) {
-                                  console.error('Drive move failed (non-fatal):', driveErr)
+                                  console.error('Drive move to date folder failed (non-fatal):', driveErr)
                       }
             }
 
