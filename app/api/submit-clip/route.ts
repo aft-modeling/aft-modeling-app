@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
+import { uploadFileToDrivePending } from '@/lib/google-drive'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -47,20 +48,67 @@ export async function POST(req: NextRequest) {
         .eq('id', editorId)
         .single()
 
+      // Count existing submissions for round number
       const { count } = await supabase
         .from('submissions')
         .select('*', { count: 'exact', head: true })
         .eq('clip_id', clipId)
+
       const round = (count || 0) + 1
 
+      // Download file from Supabase Storage and upload to Google Drive Pending folder
+      let driveFileId: string | null = null
+      let driveViewLink: string | null = null
+
+      if (storagePath) {
+        try {
+          const editorName = editor?.full_name || 'Unknown Editor'
+          console.log('[DRIVE] Downloading from Supabase Storage:', storagePath)
+
+          const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+            .from('clip-submissions')
+            .download(storagePath)
+
+          if (downloadError || !fileData) {
+            console.error('[DRIVE] Supabase download error:', downloadError)
+          } else {
+            const buffer = Buffer.from(await fileData.arrayBuffer())
+            const filename = storagePath.split('/').pop() || 'submission'
+            const mimeType = fileData.type || 'video/mp4'
+
+            console.log('[DRIVE] Uploading to Google Drive Pending folder...')
+            const driveResult = await uploadFileToDrivePending(buffer, filename, mimeType, editorName)
+            driveFileId = driveResult.id
+            driveViewLink = driveResult.webViewLink
+            console.log('[DRIVE] Uploaded to Drive:', driveFileId, driveViewLink)
+
+            // Delete from Supabase Storage (best-effort)
+            try {
+              await supabaseAdmin.storage
+                .from('clip-submissions')
+                .remove([storagePath])
+              console.log('[DRIVE] Cleaned up Supabase Storage:', storagePath)
+            } catch (cleanupErr) {
+              console.error('[DRIVE] Supabase cleanup error (non-fatal):', cleanupErr)
+            }
+          }
+        } catch (driveErr) {
+          console.error('[DRIVE] Drive upload error (non-fatal, falling back to Supabase refs):', driveErr)
+          // Fall back to Supabase references if Drive upload fails
+          driveFileId = storagePath
+          driveViewLink = fileUrl
+        }
+      }
+
+      // Insert submission with Drive references (or Supabase fallback)
       const { error: subError } = await supabaseAdmin
         .from('submissions')
         .insert({
           clip_id: clipId,
           editor_id: editorId,
           round,
-          drive_file_id: storagePath || null,
-          drive_view_link: fileUrl || null,
+          drive_file_id: driveFileId || storagePath || null,
+          drive_view_link: driveViewLink || fileUrl || null,
           drive_used_content_link: driveUsedContentLink || null,
           status: 'pending_qa',
         })
@@ -85,22 +133,30 @@ export async function POST(req: NextRequest) {
 
       // Notify all QA users about new submission
       console.log('[NOTIFY] Starting QA notification for clip:', clipId)
+
       const { data: qaUsers, error: qaError } = await supabaseAdmin
         .from('profiles')
         .select('id')
         .eq('role', 'qa')
+
       console.log('[NOTIFY] QA users found:', JSON.stringify(qaUsers), 'error:', JSON.stringify(qaError))
 
       if (qaUsers && qaUsers.length > 0) {
         const editorName = editor?.full_name || 'An editor'
-        const notifPayload = qaUsers.map((qa) => ({
-          user_id: qa.id,
-          message: editorName + ' submitted "' + (clipName || 'a clip') + '" for QA review (Round ' + round + ')',
+        const notifPayload = qaUsers.map((u) => ({
+          user_id: u.id,
+          message: `${editorName} submitted "${clipName || 'a clip'}" for QA review (Round ${round})`,
           type: 'submission_reviewed',
           clip_id: clipId,
         }))
+
         console.log('[NOTIFY] Inserting notifications:', JSON.stringify(notifPayload))
-        const { data: notifData, error: notifError } = await supabaseAdmin.from('notifications').insert(notifPayload).select()
+
+        const { data: notifData, error: notifError } = await supabaseAdmin
+          .from('notifications')
+          .insert(notifPayload)
+          .select()
+
         if (notifError) {
           console.error('[NOTIFY] Insert error:', JSON.stringify(notifError))
         } else {
@@ -111,7 +167,6 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json({ success: true, round })
-
     } catch (innerError) {
       console.error('Submit clip inner error:', innerError)
       return NextResponse.json(
