@@ -1,11 +1,13 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { deleteFileFromDrive } from '@/lib/google-drive'
 
 export async function POST(request: Request) {
   // Verify the requester is an admin or creative_director
   const supabase = createServerClient()
   const { data: { session } } = await supabase.auth.getSession()
+
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: profile } = await supabase
@@ -29,15 +31,15 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // 1. Get all submissions for this clip (need IDs for qa_reviews + storage cleanup)
+  // 1. Get all submissions for this clip (for Drive cleanup)
   const { data: submissions } = await adminClient
     .from('submissions')
-    .select('id, drive_file_id')
+    .select('id, drive_view_link')
     .eq('clip_id', clipId)
 
   const submissionIds = submissions?.map(s => s.id) || []
 
-  // 2. Delete finished_clips referencing this clip
+  // 2. Delete finished_clips for this clip
   await adminClient
     .from('finished_clips')
     .delete()
@@ -51,7 +53,20 @@ export async function POST(request: Request) {
       .in('submission_id', submissionIds)
   }
 
-  // 4. Delete files from Supabase Storage (clip-submissions bucket)
+  // 4. Delete files from Google Drive (best-effort)
+  if (submissions && submissions.length > 0) {
+    for (const sub of submissions) {
+      if (sub.drive_view_link) {
+        try {
+          await deleteFileFromDrive(sub.drive_view_link)
+        } catch (e) {
+          console.error('Drive cleanup error (non-fatal):', e)
+        }
+      }
+    }
+  }
+
+  // 5. Delete files from Supabase Storage (best-effort, for legacy data)
   try {
     const { data: storageFiles } = await adminClient.storage
       .from('clip-submissions')
@@ -67,13 +82,13 @@ export async function POST(request: Request) {
     console.error('Storage cleanup error:', e)
   }
 
-  // 5. Delete submissions for this clip
+  // 6. Delete submissions for this clip
   await adminClient
     .from('submissions')
     .delete()
     .eq('clip_id', clipId)
 
-  // 6. Delete the clip itself
+  // 7. Delete the clip itself
   const { error: clipError } = await adminClient
     .from('clips')
     .delete()
