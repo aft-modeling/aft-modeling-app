@@ -44,7 +44,7 @@ function isOverdue(dueDate: string | null, status: string): boolean {
 export default function AdminDashboard({ clips, profiles, submissions, finishedClips }: AdminDashboardProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const currentTab = searchParams.get('tab') || 'pipeline'
+  const currentTab = searchParams.get('tab') || 'cd'
 
   // Manage Team state
   const [managingRole, setManagingRole] = useState<string>('editor')
@@ -64,7 +64,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const currentRoleUsers = profiles.filter(p => p.role === managingRole)
 
   function setTab(tab: string) {
-    const url = tab === 'pipeline' ? '/dashboard/admin' : `/dashboard/admin?tab=${tab}`
+    const url = tab === 'cd' ? '/dashboard/admin' : `/dashboard/admin?tab=${tab}`
     router.push(url)
   }
 
@@ -139,10 +139,9 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
           {[
-            { id: 'pipeline', label: 'Pipeline Overview' },
+            { id: 'cd', label: 'Creative Director' },
             { id: 'editors', label: 'Editor Portals' },
             { id: 'manage', label: 'Manage Team' },
-            { id: 'cd', label: 'Creative Director' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -158,72 +157,6 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
             </button>
           ))}
         </div>
-
-        {/* Pipeline Overview Tab */}
-        {currentTab === 'pipeline' && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {STATUS_COLUMNS.map(col => {
-                const colClips = col.status === 'finished'
-                  ? finishedClips.map(fc => ({
-                      ...fc,
-                      status: 'finished' as ClipStatus,
-                      assigned_editor: profiles.find(p => p.id === (clips.find(c => c.name === fc.clip_name)?.assigned_editor_id))
-                    }))
-                  : clips.filter(c => c.status === col.status)
-
-                return (
-                  <div key={col.status} className="bg-white rounded-xl border border-gray-200 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className={clsx('px-2.5 py-1 rounded-full text-xs font-medium', col.color)}>
-                        {col.label}
-                      </span>
-                      <span className="text-xs text-gray-500">{colClips.length}</span>
-                    </div>
-                    <div className="space-y-2">
-                      {colClips.length === 0 && (
-                        <p className="text-xs text-gray-400 text-center py-4">No clips</p>
-                      )}
-                      {colClips.map((clip: any) => (
-                        <div
-                          key={clip.id}
-                          className={clsx('p-3 rounded-lg border cursor-pointer', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')}
-                          onClick={() => setDetailClip(clip)}
-                        >
-                          <div className="flex items-start justify-between gap-1">
-                            <p className="text-sm font-medium text-gray-900 truncate">{clip.name || clip.clip_name}</p>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteClip(clip.id, clip.name || clip.clip_name); }}
-                              className="p-1 text-gray-400 hover:text-red-600 rounded flex-shrink-0"
-                              title="Delete clip"
-                              disabled={deleting === clip.id}
-                            >
-                              {deleting === clip.id ? (
-                                <span className="inline-block w-3.5 h-3.5 border-2 border-red-300 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Trash2 size={14} />
-                              )}
-                            </button>
-                          </div>
-                          {clip.assigned_editor && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Editor: {clip.assigned_editor.full_name || clip.assigned_editor.email}
-                            </p>
-                          )}
-                          {clip.due_date && (
-                            <p className={clsx('text-xs mt-1', isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-400')}>
-                              {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Editor Portals Tab */}
         {currentTab === 'editors' && (
@@ -254,13 +187,16 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                   {clips.filter(c => c.assigned_editor_id === selectedEditor).map(clip => (
                     <div
                       key={clip.id}
-                      className={clsx('flex items-center justify-between p-3 rounded-lg border cursor-pointer', isOverdue(clip.due_date, clip.status) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100')}
+                      className={clsx('flex items-center justify-between p-3 rounded-lg border cursor-pointer',
+                        isOverdue(clip.due_date, clip.status)
+                          ? 'bg-red-50 border-red-200'
+                          : 'bg-gray-50 border-gray-100')}
                       onClick={() => setDetailClip(clip)}
                     >
                       <div>
                         <p className="text-sm font-medium text-gray-900">{clip.name}</p>
                         <p className={clsx('text-xs', isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-500')}>
-                          {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
+                          {isOverdue(clip.due_date, clip.status) ? 'â  Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
                         </p>
                       </div>
                       <span className={clsx(
@@ -319,8 +255,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                     <input
-                      type="text"
-                      required
+                      type="text" required
                       value={newUser.full_name}
                       onChange={e => setNewUser(prev => ({ ...prev, full_name: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
@@ -330,8 +265,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                     <input
-                      type="email"
-                      required
+                      type="email" required
                       value={newUser.email}
                       onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
@@ -341,8 +275,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
                     <input
-                      type="text"
-                      required
+                      type="text" required
                       value={newUser.password}
                       onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
@@ -350,16 +283,12 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                     />
                   </div>
                   <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      disabled={loading}
+                    <button type="submit" disabled={loading}
                       className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
                     >
                       {loading ? 'Creating...' : `Create ${currentRoleConfig.singular}`}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddUser(false)}
+                    <button type="button" onClick={() => setShowAddUser(false)}
                       className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
                     >
                       Cancel
@@ -445,14 +374,11 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
 
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-600">Filter by editor:</span>
-              <button
-                onClick={() => setCdEditorFilter('all')}
+              <button onClick={() => setCdEditorFilter('all')}
                 className={`px-3 py-1 text-sm rounded-full ${cdEditorFilter === 'all' ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               >All</button>
               {editors.map(e => (
-                <button
-                  key={e.id}
-                  onClick={() => setCdEditorFilter(e.id)}
+                <button key={e.id} onClick={() => setCdEditorFilter(e.id)}
                   className={`px-3 py-1 text-sm rounded-full ${cdEditorFilter === e.id ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >{e.full_name}</button>
               ))}
@@ -470,7 +396,6 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                 const colClips = col.key === 'in_qa'
                   ? fClips.filter(x => x.status === 'in_qa' || x.status === 'submitted')
                   : fClips.filter(x => x.status === col.key)
-
                 return (
                   <div key={col.key} className="space-y-2">
                     <div className={`card px-3 py-2.5 border-t-2 ${col.color} flex items-center justify-between`}>
@@ -483,15 +408,11 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                         <div key={clip.id} className={`card p-3 space-y-2 hover:shadow-md transition-shadow ${isOverdue(clip.due_date, clip.status) ? 'ring-2 ring-red-300 bg-red-50/30' : ''}`}>
                           <div className="flex items-start justify-between gap-1">
                             <p className="text-sm font-medium text-gray-900 leading-tight">{clip.name}
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setEditingClip(clip); }}
-                                className="ml-2 p-1 text-gray-400 hover:text-indigo-600 rounded"
-                                title="Edit clip"
+                              <button onClick={(e) => { e.stopPropagation(); setEditingClip(clip); }}
+                                className="ml-2 p-1 text-gray-400 hover:text-indigo-600 rounded" title="Edit clip"
                               ><Pencil size={14} /></button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteClip(clip.id, clip.name); }}
-                                className="ml-1 p-1 text-gray-400 hover:text-red-600 rounded"
-                                title="Delete clip"
+                              <button onClick={(e) => { e.stopPropagation(); handleDeleteClip(clip.id, clip.name); }}
+                                className="ml-1 p-1 text-gray-400 hover:text-red-600 rounded" title="Delete clip"
                                 disabled={deleting === clip.id}
                               >
                                 {deleting === clip.id ? <span className="inline-block w-3.5 h-3.5 border-2 border-red-300 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
@@ -508,7 +429,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                           )}
                           <div className="flex items-center justify-between">
                             <span className={`text-xs ${isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
-                              {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{clip.due_date}
+                              {isOverdue(clip.due_date, clip.status) ? 'â  Overdue: ' : 'Due: '}{clip.due_date}
                             </span>
                             {clip.example_reel_url && <a href={clip.example_reel_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:underline">Example</a>}
                           </div>
