@@ -15,15 +15,18 @@ function getDriveClient() {
 // Get or create a folder by name under a parent
 export async function getOrCreateFolder(name: string, parentId: string): Promise<string> {
   const drive = getDriveClient()
+
   const res = await drive.files.list({
     q: `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`,
     fields: 'files(id, name)',
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
   })
+
   if (res.data.files && res.data.files.length > 0) {
     return res.data.files[0].id!
   }
+
   const folder = await drive.files.create({
     requestBody: {
       name,
@@ -33,15 +36,18 @@ export async function getOrCreateFolder(name: string, parentId: string): Promise
     fields: 'id',
     supportsAllDrives: true,
   })
+
   return folder.data.id!
 }
 
 // Get month/year and month/day folder names
 function getDateFolderNames(date: Date) {
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December']
   const month = months[date.getMonth()]
   const year = date.getFullYear()
   const day = date.getDate()
+
   return {
     monthYear: `${month} ${year}`,
     monthDay: `${month} ${day}`,
@@ -58,6 +64,7 @@ export async function uploadFileToDrive(
 ): Promise<{ id: string; webViewLink: string }> {
   const drive = getDriveClient()
   const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!
+
   const { monthYear, monthDay } = getDateFolderNames(new Date())
 
   // Create folder structure: Root / Editor / Month Year / Month Day
@@ -96,6 +103,7 @@ export async function uploadFileToDrivePending(
 ): Promise<{ id: string; webViewLink: string }> {
   const drive = getDriveClient()
   const pendingFolderId = process.env.GOOGLE_DRIVE_PENDING_FOLDER_ID!
+
   const { monthYear, monthDay } = getDateFolderNames(new Date())
 
   // Create folder structure: Pending Root / Editor / Month Year / Month Day
@@ -129,6 +137,7 @@ export async function uploadFileToDrivePending(
 export async function moveFileToFinished(fileId: string, editorName: string): Promise<string> {
   const drive = getDriveClient()
   const finishedFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!
+
   const { monthYear, monthDay } = getDateFolderNames(new Date())
 
   // Create finished folder hierarchy
@@ -158,6 +167,7 @@ export async function moveFileToFinished(fileId: string, editorName: string): Pr
 export async function moveFileToDateFolder(fileId: string, editorName: string): Promise<string> {
   const drive = getDriveClient()
   const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!
+
   const { monthYear, monthDay } = getDateFolderNames(new Date())
 
   // Create date-based folder structure
@@ -182,8 +192,8 @@ export async function moveFileToDateFolder(fileId: string, editorName: string): 
 }
 
 // Extract Google Drive file ID from a webViewLink URL
-// e.g. "https://drive.google.com/file/d/ABC123/view?usp=drivesdk" â "ABC123"
-function extractDriveFileId(driveViewLink: string): string | null {
+// e.g. "https://drive.google.com/file/d/ABC123/view?usp=drivesdk" → "ABC123"
+export function extractDriveFileId(driveViewLink: string): string | null {
   const match = driveViewLink.match(/\/file\/d\/([^/]+)/)
   return match ? match[1] : null
 }
@@ -196,6 +206,16 @@ export async function deleteFileFromDrive(driveViewLink: string): Promise<void> 
     console.warn('Could not extract Drive file ID from:', driveViewLink)
     return
   }
+  await deleteFileFromDriveById(fileId)
+}
+
+// Delete a file from Google Drive given its file ID directly
+// Best-effort: won't throw if file is already gone
+export async function deleteFileFromDriveById(fileId: string): Promise<void> {
+  if (!fileId) {
+    console.warn('deleteFileFromDriveById called with empty fileId')
+    return
+  }
 
   const drive = getDriveClient()
   try {
@@ -203,8 +223,9 @@ export async function deleteFileFromDrive(driveViewLink: string): Promise<void> 
       fileId,
       supportsAllDrives: true,
     })
+    console.log('Drive file deleted successfully:', fileId)
   } catch (err: any) {
-    // 404 means file already deleted â that's fine
+    // 404 means file already deleted — that's fine
     if (err?.code === 404 || err?.status === 404) {
       console.warn('Drive file already deleted:', fileId)
     } else {
