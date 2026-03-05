@@ -6,7 +6,9 @@ import { useState } from 'react'
 import StatusBadge from '@/components/StatusBadge'
 import SubmitClipModal from '@/components/editor/SubmitClipModal'
 import ClipDetailModal from '@/components/ClipDetailModal'
-import { Film, Clock, AlertCircle, ExternalLink, MessageSquare, Play, AlertTriangle, ChevronDown, ChevronUp, CheckCircle, XCircle } from 'lucide-react'
+import { Film, Clock, AlertCircle, ExternalLink, MessageSquare, Play, AlertTriangle, ChevronDown, ChevronUp, CheckCircle, XCircle, Filter } from 'lucide-react'
+
+type ClipFilter = 'assigned' | 'in_progress' | 'overdue' | 'all' | 'finished'
 
 interface EditorDashboardProps {
   clips: any[]
@@ -26,6 +28,7 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
   const [selectedClip, setSelectedClip] = useState<any>(null)
   const [detailClip, setDetailClip] = useState<any>(null)
   const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set())
+  const [activeFilter, setActiveFilter] = useState<ClipFilter>('all')
   const supabase = createClient()
   const router = useRouter()
 
@@ -50,8 +53,32 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
     if (!error) router.refresh()
   }
 
-  const pending = clips.filter(c => c.status === 'assigned' || c.status === 'in_progress')
   const revisions = clips.filter(c => c.status === 'needs_revision')
+  const assignedClips = clips.filter(c => c.status === 'assigned')
+  const inProgressClips = clips.filter(c => c.status === 'in_progress')
+  const overdueClips = clips.filter(c => isOverdue(c.due_date, c.status) && !['finished', 'approved'].includes(c.status))
+  const finishedClips = clips.filter(c => c.status === 'finished' || c.status === 'approved')
+  const activeClips = clips.filter(c => !['finished', 'approved'].includes(c.status))
+
+  const getFilteredClips = () => {
+    switch (activeFilter) {
+      case 'assigned': return assignedClips
+      case 'in_progress': return inProgressClips
+      case 'overdue': return overdueClips
+      case 'finished': return finishedClips
+      case 'all': return activeClips
+    }
+  }
+
+  const filteredClips = getFilteredClips()
+
+  const filters: { key: ClipFilter; label: string; count: number }[] = [
+    { key: 'all', label: 'All Clips', count: activeClips.length },
+    { key: 'assigned', label: 'Assigned', count: assignedClips.length },
+    { key: 'in_progress', label: 'In Progress', count: inProgressClips.length },
+    { key: 'overdue', label: 'Overdue', count: overdueClips.length },
+    { key: 'finished', label: 'Finished', count: finishedClips.length },
+  ]
   return (
     <div className="space-y-6">
 
@@ -118,19 +145,43 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
           </div>
         </div>
       )}
-      {/* Active Clips */}
+      {/* Clip Filters */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <Film className="w-4 h-4 text-brand-600" />
-          <span className="text-sm font-semibold text-gray-700">
-            {pending.length} active clip{pending.length === 1 ? '' : 's'}
-          </span>
+          <span className="text-sm font-semibold text-gray-700">My Clips</span>
         </div>
-        {pending.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 text-sm">No clips assigned yet</div>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {filters.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setActiveFilter(f.key)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeFilter === f.key
+                  ? f.key === 'overdue'
+                    ? 'bg-red-100 text-red-700 ring-1 ring-red-300'
+                    : 'bg-brand-100 text-brand-700 ring-1 ring-brand-300'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {f.label}
+              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs ${
+                activeFilter === f.key
+                  ? f.key === 'overdue' ? 'bg-red-200 text-red-800' : 'bg-brand-200 text-brand-800'
+                  : 'bg-gray-200 text-gray-700'
+              }`}>
+                {f.count}
+              </span>
+            </button>
+          ))}
+        </div>
+        {filteredClips.length === 0 ? (
+          <div className="text-center py-8 text-gray-400 text-sm">
+            {activeFilter === 'all' ? 'No clips assigned yet' : `No ${filters.find(f => f.key === activeFilter)?.label.toLowerCase()} clips`}
+          </div>
         ) : (
           <div className="space-y-2">
-            {pending.map((clip: any) => {
+            {filteredClips.map((clip: any) => {
               const clipSubs = getClipSubmissions(clip.id)
               const isExpanded = expandedHistory.has(clip.id)
               return (
