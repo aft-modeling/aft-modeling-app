@@ -10,7 +10,6 @@ export default async function EditorPage() {
       .from('clips')
       .select('*')
       .eq('assigned_editor_id', session!.user.id)
-      .in('status', ['assigned', 'in_progress', 'needs_revision'])
       .order('due_date', { ascending: true }),
     supabase
       .from('submissions')
