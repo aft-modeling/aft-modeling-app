@@ -191,6 +191,35 @@ export async function moveFileToDateFolder(fileId: string, editorName: string): 
   return updated.data.webViewLink || ''
 }
 
+// Move a file from the Pending folder to the Rejections folder
+// Folder structure: Rejections Root / {editorName} / {Month Year} / {Month Day}
+export async function moveFileToRejections(fileId: string, editorName: string): Promise<string> {
+  const drive = getDriveClient()
+  const rejectionsFolderId = process.env.GOOGLE_DRIVE_REJECTIONS_FOLDER_ID!
+
+  const { monthYear, monthDay } = getDateFolderNames(new Date())
+
+  // Create rejections folder hierarchy: Rejections / Editor / Month Year / Month Day
+  const editorFolderId = await getOrCreateFolder(editorName, rejectionsFolderId)
+  const monthFolderId = await getOrCreateFolder(monthYear, editorFolderId)
+  const dayFolderId = await getOrCreateFolder(monthDay, monthFolderId)
+
+  // Get current parents so we can remove them
+  const file = await drive.files.get({ fileId, fields: 'parents', supportsAllDrives: true })
+  const previousParents = file.data.parents?.join(',') || ''
+
+  // Move file to the rejections date-based folder
+  const updated = await drive.files.update({
+    fileId,
+    addParents: dayFolderId,
+    removeParents: previousParents,
+    fields: 'id, parents, webViewLink',
+    supportsAllDrives: true,
+  })
+
+  return updated.data.webViewLink || ''
+}
+
 // Extract Google Drive file ID from a webViewLink URL
 // e.g. "https://drive.google.com/file/d/ABC123/view?usp=drivesdk" → "ABC123"
 export function extractDriveFileId(driveViewLink: string): string | null {
