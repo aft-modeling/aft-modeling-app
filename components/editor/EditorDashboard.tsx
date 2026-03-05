@@ -127,6 +127,12 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
                                   )) : <span className="text-amber-500">Pending QA</span>}
                                 </div>
                                 {review?.qa_notes && <p className="text-gray-500 mt-0.5 ml-4">{review.qa_notes}</p>}
+                                {sub.drive_view_link && (
+                                  <a href={sub.drive_view_link} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-brand-600 hover:text-brand-700 font-medium mt-0.5 ml-4">
+                                    <ExternalLink className="w-3 h-3" /> View Submission
+                                  </a>
+                                )}
                               </div>
                             )
                           })}
@@ -231,6 +237,12 @@ export default function EditorDashboard({ clips, submissions, editorId }: Editor
                                   )) : <span className="text-amber-500">Pending QA</span>}
                                 </div>
                                 {review?.qa_notes && <p className="text-gray-500 mt-0.5 ml-4">{review.qa_notes}</p>}
+                                {sub.drive_view_link && (
+                                  <a href={sub.drive_view_link} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-brand-600 hover:text-brand-700 font-medium mt-0.5 ml-4">
+                                    <ExternalLink className="w-3 h-3" /> View Submission
+                                  </a>
+                                )}
                               </div>
                             )
                           })}
