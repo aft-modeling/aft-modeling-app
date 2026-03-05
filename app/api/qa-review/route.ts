@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { moveFileToFinished, deleteFileFromDrive } from '@/lib/google-drive'
+import { moveFileToFinished, moveFileToRejections } from '@/lib/google-drive'
 import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
@@ -157,20 +157,31 @@ export async function POST(req: NextRequest) {
         .update({ status: 'in_progress', updated_at: new Date().toISOString() })
         .eq('id', clipId)
 
-      // Delete the file from Google Drive Pending folder (best-effort)
+      // Move the file from Pending to Rejections folder in Google Drive (best-effort)
       const { data: submission } = await supabase
         .from('submissions')
-        .select('drive_view_link')
+        .select('drive_file_id, drive_view_link, editor:profiles(*)')
         .eq('id', submissionId)
         .single()
 
-      if (submission?.drive_view_link) {
+      if (submission?.drive_file_id && submission?.editor?.full_name) {
         try {
-          console.log('[DRIVE] Deleting denied submission file from Pending folder')
-          await deleteFileFromDrive(submission.drive_view_link)
-          console.log('[DRIVE] File deleted from Pending folder')
+          console.log('[DRIVE] Moving denied submission to Rejections folder:', submission.drive_file_id)
+          const rejectionLink = await moveFileToRejections(
+            submission.drive_file_id,
+            submission.editor.full_name
+          )
+          console.log('[DRIVE] File moved to Rejections folder:', rejectionLink)
+
+          // Update the submission's drive_view_link to point to the new location
+          if (rejectionLink) {
+            await supabase
+              .from('submissions')
+              .update({ drive_view_link: rejectionLink })
+              .eq('id', submissionId)
+          }
         } catch (driveErr) {
-          console.error('Drive delete failed (non-fatal):', driveErr)
+          console.error('Drive move to rejections failed (non-fatal):', driveErr)
         }
       }
 
