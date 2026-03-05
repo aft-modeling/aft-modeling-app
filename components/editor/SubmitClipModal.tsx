@@ -10,6 +10,9 @@ interface SubmitClipModalProps {
   onClose: () => void
 }
 
+const MAX_FILE_SIZE_MB = 500
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
 export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipModalProps) {
   const router = useRouter()
   const supabase = createClient()
@@ -21,11 +24,21 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
   const [dragOver, setDragOver] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
 
+  function validateAndSetFile(selectedFile: File | null) {
+    if (selectedFile && selectedFile.size > MAX_FILE_SIZE_BYTES) {
+      setError(`File is too large (${formatBytes(selectedFile.size)}). Maximum allowed size is ${MAX_FILE_SIZE_MB}MB.`)
+      setFile(null)
+      return
+    }
+    setError('')
+    setFile(selectedFile)
+  }
+
   function handleFileDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragOver(false)
     const dropped = e.dataTransfer.files[0]
-    if (dropped) setFile(dropped)
+    if (dropped) validateAndSetFile(dropped)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -159,7 +172,7 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
                 type="file"
                 accept="video/*"
                 className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                onChange={(e) => validateAndSetFile(e.target.files?.[0] || null)}
               />
               {file ? (
                 <div className="flex items-center justify-center gap-2">
@@ -173,7 +186,7 @@ export default function SubmitClipModal({ clip, editorId, onClose }: SubmitClipM
                 <div>
                   <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm text-gray-500">Drop your video here or click to browse</p>
-                  <p className="text-xs text-gray-400 mt-1">Supports large video files</p>
+                  <p className="text-xs text-gray-400 mt-1">Max file size: {MAX_FILE_SIZE_MB}MB</p>
                 </div>
               )}
             </div>
