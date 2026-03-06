@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
@@ -16,28 +17,21 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Fetch all used_on values from finished_clips
-  const { data: clips, error } = await supabase
-    .from('finished_clips')
-    .select('used_on')
-    .not('used_on', 'is', null)
+  // Use service role key to bypass RLS
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  // Fetch predefined tag options
+  const { data: tagOptions, error } = await adminClient
+    .from('tag_options')
+    .select('id, name, color')
+    .order('name', { ascending: true })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Parse comma-separated tags, deduplicate, and sort
-  const tagSet = new Set<string>()
-  clips?.forEach(clip => {
-    if (clip.used_on) {
-      clip.used_on.split(',').forEach((tag: string) => {
-        const trimmed = tag.trim()
-        if (trimmed) tagSet.add(trimmed)
-      })
-    }
-  })
-
-  const tags = Array.from(tagSet).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
-
-  return NextResponse.json({ tags })
+  return NextResponse.json({ tags: tagOptions || [] })
 }
