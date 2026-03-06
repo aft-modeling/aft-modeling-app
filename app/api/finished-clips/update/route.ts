@@ -16,9 +16,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { finishedClipId, clipName } = await request.json()
-  if (!finishedClipId || !clipName?.trim()) {
-    return NextResponse.json({ error: 'Missing finishedClipId or clipName' }, { status: 400 })
+  const { finishedClipId, clipName, usedOn } = await request.json()
+  if (!finishedClipId) {
+    return NextResponse.json({ error: 'Missing finishedClipId' }, { status: 400 })
+  }
+
+  if (!clipName?.trim() && usedOn === undefined) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   }
 
   // Get the clip_id from the finished clip
@@ -32,14 +36,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Finished clip not found' }, { status: 404 })
   }
 
-  // Update the clip name
-  const { error: updateError } = await supabase
-    .from('clips')
-    .update({ name: clipName.trim(), updated_at: new Date().toISOString() })
-    .eq('id', finishedClip.clip_id)
+  // Update the clip name if provided
+  if (clipName?.trim()) {
+    const { error: updateError } = await supabase
+      .from('clips')
+      .update({ name: clipName.trim(), updated_at: new Date().toISOString() })
+      .eq('id', finishedClip.clip_id)
 
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 400 })
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 400 })
+    }
+  }
+
+  // Update used_on tags if provided
+  if (usedOn !== undefined) {
+    const { error: tagError } = await supabase
+      .from('finished_clips')
+      .update({ used_on: usedOn || null })
+      .eq('id', finishedClipId)
+
+    if (tagError) {
+      return NextResponse.json({ error: tagError.message }, { status: 400 })
+    }
   }
 
   return NextResponse.json({ success: true })
