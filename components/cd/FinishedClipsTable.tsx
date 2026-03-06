@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Trophy, ExternalLink, Pencil, Trash2, Check, X } from 'lucide-react'
+import { Trophy, ExternalLink, Pencil, Trash2, Check, X, Plus, Tag } from 'lucide-react'
 
 interface FinishedClipRow {
   id: string
@@ -18,11 +18,104 @@ interface FinishedClipsTableProps {
   clips: FinishedClipRow[]
 }
 
+function parseTags(usedOn: string | null): string[] {
+  if (!usedOn) return []
+  return usedOn.split(',').map(t => t.trim()).filter(Boolean)
+}
+
 export default function FinishedClipsTable({ clips }: FinishedClipsTableProps) {
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [loading, setLoading] = useState<string | null>(null)
+
+  // Tag editing state
+  const [editingTagsId, setEditingTagsId] = useState<string | null>(null)
+  const [editTags, setEditTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [availableTags, setAvailableTags] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [savingTags, setSavingTags] = useState(false)
+  const tagInputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
+
+  // Fetch available tags on mount
+  useEffect(() => {
+    fetch('/api/finished-clips/get-tags')
+      .then(res => res.json())
+      .then(data => {
+        if (data.tags) setAvailableTags(data.tags)
+      })
+      .catch(() => {})
+  }, [])
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+          tagInputRef.current && !tagInputRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const filteredSuggestions = availableTags.filter(
+    tag => tag.toLowerCase().includes(tagInput.toLowerCase()) &&
+           !editTags.some(t => t.toLowerCase() === tag.toLowerCase())
+  ).slice(0, 8)
+
+  function startEditTags(fc: FinishedClipRow) {
+    setEditingTagsId(fc.id)
+    setEditTags(parseTags(fc.used_on))
+    setTagInput('')
+    setShowSuggestions(false)
+    setTimeout(() => tagInputRef.current?.focus(), 50)
+  }
+
+  function addTag(tag: string) {
+    const trimmed = tag.trim()
+    if (!trimmed) return
+    if (editTags.some(t => t.toLowerCase() === trimmed.toLowerCase())) return
+    setEditTags([...editTags, trimmed])
+    setTagInput('')
+    setShowSuggestions(false)
+    tagInputRef.current?.focus()
+  }
+
+  function removeTag(index: number) {
+    setEditTags(editTags.filter((_, i) => i !== index))
+  }
+
+  async function saveTags() {
+    setSavingTags(true)
+    try {
+      const usedOn = editTags.length > 0 ? editTags.join(', ') : ''
+      const res = await fetch('/api/finished-clips/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ finishedClipId: editingTagsId, usedOn }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert('Failed to save tags: ' + (data.error || 'Unknown error'))
+      } else {
+        // Add any new tags to available tags
+        editTags.forEach(tag => {
+          if (!availableTags.some(t => t.toLowerCase() === tag.toLowerCase())) {
+            setAvailableTags(prev => [...prev, tag].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())))
+          }
+        })
+      }
+    } catch {
+      alert('Failed to save tags')
+    } finally {
+      setEditingTagsId(null)
+      setSavingTags(false)
+      router.refresh()
+    }
+  }
 
   async function handleRename(fc: FinishedClipRow) {
     if (!editName.trim() || editName.trim() === fc.clip?.name) {
@@ -137,9 +230,107 @@ export default function FinishedClipsTable({ clips }: FinishedClipsTableProps) {
                     className="flex items-center gap-1 text-brand-600 hover:text-brand-700 text-xs font-medium">
                     <ExternalLink className="w-3 h-3" /> View
                   </a>
-                ) : 'â'}
+                ) : '\u2014'}
               </td>
-              <td className="px-4 py-3 text-gray-500 text-xs">{fc.used_on || <span className="text-gray-300">Not set</span>}</td>
+
+              {/* Used On - Tag Editor */}
+              <td className="px-4 py-3 min-w-[200px]">
+                {editingTagsId === fc.id ? (
+                  <div className="relative">
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {editTags.map((tag, i) => (
+                        <span key={i} className="inline-flex items-center gap-0.5 bg-brand-100 text-brand-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                          {tag}
+                          <button onClick={() => removeTag(i)} className="hover:text-red-600 ml-0.5">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="relative">
+                      <input
+                        ref={tagInputRef}
+                        type="text"
+                        value={tagInput}
+                        onChange={e => {
+                          setTagInput(e.target.value)
+                          setShowSuggestions(true)
+                        }}
+                        onFocus={() => setShowSuggestions(true)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (tagInput.trim()) addTag(tagInput)
+                          }
+                          if (e.key === 'Escape') {
+                            setEditingTagsId(null)
+                          }
+                          if (e.key === 'Backspace' && !tagInput && editTags.length > 0) {
+                            removeTag(editTags.length - 1)
+                          }
+                        }}
+                        placeholder="Type tag name..."
+                        className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                      {showSuggestions && (tagInput || filteredSuggestions.length > 0) && (
+                        <div ref={suggestionsRef} className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-32 overflow-y-auto">
+                          {filteredSuggestions.map(tag => (
+                            <button
+                              key={tag}
+                              onClick={() => addTag(tag)}
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-brand-50 hover:text-brand-700 transition-colors"
+                            >
+                              {tag}
+                            </button>
+                          ))}
+                          {tagInput.trim() && !filteredSuggestions.some(t => t.toLowerCase() === tagInput.trim().toLowerCase()) && (
+                            <button
+                              onClick={() => addTag(tagInput)}
+                              className="w-full text-left px-3 py-1.5 text-xs text-brand-600 hover:bg-brand-50 font-medium flex items-center gap-1"
+                            >
+                              <Plus className="w-3 h-3" /> Create \"{tagInput.trim()}\"
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <button
+                        onClick={saveTags}
+                        disabled={savingTags}
+                        className="px-2 py-0.5 bg-brand-600 text-white text-xs rounded hover:bg-brand-700 disabled:opacity-50"
+                      >
+                        {savingTags ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => setEditingTagsId(null)}
+                        className="px-2 py-0.5 text-gray-500 text-xs rounded hover:bg-gray-100"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => startEditTags(fc)}
+                    className="cursor-pointer group min-h-[24px] flex flex-wrap gap-1 items-center"
+                    title="Click to edit tags"
+                  >
+                    {parseTags(fc.used_on).length > 0 ? (
+                      parseTags(fc.used_on).map((tag, i) => (
+                        <span key={i} className="inline-flex items-center bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                          {tag}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-300 text-xs group-hover:text-brand-500 flex items-center gap-1">
+                        <Tag className="w-3 h-3" /> Add tags
+                      </span>
+                    )}
+                  </div>
+                )}
+              </td>
+
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1">
                   <button
