@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -25,8 +26,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   }
 
-  // Get the clip_id from the finished clip
-  const { data: finishedClip, error: fetchError } = await supabase
+  // Use service role key to bypass RLS
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: finishedClip, error: fetchError } = await adminClient
     .from('finished_clips')
     .select('clip_id')
     .eq('id', finishedClipId)
@@ -36,25 +42,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Finished clip not found' }, { status: 404 })
   }
 
-  // Update the clip name if provided
   if (clipName?.trim()) {
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminClient
       .from('clips')
       .update({ name: clipName.trim(), updated_at: new Date().toISOString() })
       .eq('id', finishedClip.clip_id)
-
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 400 })
     }
   }
 
-  // Update used_on tags if provided
   if (usedOn !== undefined) {
-    const { error: tagError } = await supabase
+    const { error: tagError } = await adminClient
       .from('finished_clips')
       .update({ used_on: usedOn || null })
       .eq('id', finishedClipId)
-
     if (tagError) {
       return NextResponse.json({ error: tagError.message }, { status: 400 })
     }
