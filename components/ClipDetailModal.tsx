@@ -39,11 +39,9 @@ export default function ClipDetailModal({ clipId, onClose }: ClipDetailModalProp
 
   function isOverdue(dueDate: string | null, status: string): boolean {
     if (!dueDate || status === 'finished' || status === 'approved') return false
-    const due = new Date(dueDate)
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    due.setHours(0, 0, 0, 0)
-    return due < today
+    const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
+    return dueDate < todayStr
   }
 
   return (
