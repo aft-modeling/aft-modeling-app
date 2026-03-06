@@ -24,11 +24,9 @@ const COLUMNS = [
 
 function isOverdue(dueDate: string | null, status: string): boolean {
   if (!dueDate || status === 'finished' || status === 'approved') return false
-  const due = new Date(dueDate)
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return due < today
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
+  return dueDate < todayStr
 }
 export default function CDDashboard({ clips, editors, finishedClips }: CDDashboardProps) {
   const [showAddModal, setShowAddModal] = useState(false)
