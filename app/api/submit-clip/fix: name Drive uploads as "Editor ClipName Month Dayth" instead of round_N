@@ -73,7 +73,13 @@ export async function POST(req: NextRequest) {
             console.error('[DRIVE] Supabase download error:', downloadError)
           } else {
             const buffer = Buffer.from(await fileData.arrayBuffer())
-            const filename = storagePath.split('/').pop() || 'submission'
+            const ext = (storagePath.split('.').pop() || 'mp4').toLowerCase()
+            const now = new Date()
+            const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
+            const day = now.getDate()
+            const ordinal = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th'
+            const dateStr = months[now.getMonth()] + ' ' + day + ordinal
+            const filename = (editorName + ' ' + (clipName || 'Clip') + ' ' + dateStr + '.' + ext).replace(/[/\\?%*:|"<>]/g, '')
             const mimeType = fileData.type || 'video/mp4'
 
             console.log('[DRIVE] Uploading to Google Drive Pending folder...')
