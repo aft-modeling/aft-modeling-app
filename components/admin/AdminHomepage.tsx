@@ -8,6 +8,8 @@ import { ALL_PORTALS } from '@/lib/portals'
 interface AdminHomepageProps {
   employeeCount: number
   portalAccessCounts: Record<string, number>
+  totalEstimatedPayroll: number
+  hasOpenPayPeriod: boolean
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -18,7 +20,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Users,
 }
 
-export default function AdminHomepage({ employeeCount, portalAccessCounts }: AdminHomepageProps) {
+export default function AdminHomepage({ employeeCount, portalAccessCounts, totalEstimatedPayroll, hasOpenPayPeriod }: AdminHomepageProps) {
   return (
     <div className="space-y-8">
       {/* Page Header */}
@@ -39,13 +41,17 @@ export default function AdminHomepage({ employeeCount, portalAccessCounts }: Adm
         </div>
 
         {/* Total Estimated Payroll Card */}
-        <div className="card p-6">
+        <Link href="/portal/payroll" className="card p-6 hover:shadow-md transition-shadow cursor-pointer">
           <p className="text-gray-600 text-sm font-medium mb-2">Total Estimated Payroll</p>
           <div className="flex items-baseline gap-3">
-            <p className="text-4xl font-bold text-gray-900">$0.00</p>
-            <p className="text-gray-500 text-sm">per pay period</p>
+            <p className="text-4xl font-bold text-gray-900">
+              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalEstimatedPayroll)}
+            </p>
+            <p className="text-gray-500 text-sm">
+              {hasOpenPayPeriod ? 'per pay period' : 'No active pay period'}
+            </p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Portal Cards Grid */}
@@ -56,6 +62,7 @@ export default function AdminHomepage({ employeeCount, portalAccessCounts }: Adm
             const IconComponent = iconMap[portal.icon] || Users
             const accessCount = portalAccessCounts[portal.id] || 0
             const isActive = portal.active
+            const isAdminOnly = portal.adminOnly === true
 
             if (isActive) {
               return (
@@ -73,8 +80,16 @@ export default function AdminHomepage({ employeeCount, portalAccessCounts }: Adm
 
                     {/* Employee Count with Access */}
                     <div className="py-3 border-t border-gray-100">
-                      <p className="text-2xl font-bold text-gray-900">{accessCount}</p>
-                      <p className="text-gray-600 text-sm">employees with access</p>
+                      {isAdminOnly ? (
+                        <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                          Admin Only
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-2xl font-bold text-gray-900">{accessCount}</p>
+                          <p className="text-gray-600 text-sm">employees with access</p>
+                        </>
+                      )}
                     </div>
 
                     {/* Manage Button */}
