@@ -1,5 +1,24 @@
 export type Role = 'creative_director' | 'editor' | 'qa' | 'admin'
 
+export type PortalId = 'video-editing' | 'scheduling' | 'payroll' | 'chatting' | 'client-portal'
+
+export interface PortalAccess {
+  id: string
+  user_id: string
+  portal_id: PortalId
+  granted_at: string
+  granted_by: string | null
+}
+
+export interface PortalConfig {
+  id: PortalId
+  name: string
+  description: string
+  icon: string
+  href: string
+  active: boolean
+}
+
 export type ClipStatus =
   | 'assigned'        // CD assigned to editor
   | 'in_progress'     // Editor is working on it
