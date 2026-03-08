@@ -4,7 +4,7 @@ export const ALL_PORTALS: PortalConfig[] = [
   {
     id: 'video-editing',
     name: 'Video Editing',
-    description: 'Content production pipeline \u2014 clip assignment, editing, QA review',
+    description: 'Content production pipeline — clip assignment, editing, QA review',
     icon: 'Film',
     href: '/portal/video-editing',
     active: true,
