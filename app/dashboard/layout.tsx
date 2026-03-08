@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Sidebar from '@/components/Sidebar'
+import HomeSidebar from '@/components/HomeSidebar'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createServerClient()
@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar profile={profile} />
+      <HomeSidebar profile={profile} />
       <main className="flex-1 overflow-y-auto">
         <div className="p-6 max-w-7xl mx-auto">
           {children}
