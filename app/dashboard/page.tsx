@@ -14,10 +14,9 @@ export default async function DashboardPage() {
 
   if (!profile) redirect('/login')
 
-  if (profile.role === 'creative_director') redirect('/dashboard/cd')
-  if (profile.role === 'editor') redirect('/dashboard/editor')
-    if (profile.role === 'admin') redirect('/dashboard/admin')
-  if (profile.role === 'qa') redirect('/dashboard/qa')
+  // V2: Route to homepage based on role
+  if (profile.role === 'admin') redirect('/dashboard/admin-home')
 
-  redirect('/login')
+  // All employee roles go to the employee homepage
+  redirect('/dashboard/employee-home')
 }
