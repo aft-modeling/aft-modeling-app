@@ -15,7 +15,7 @@ export const ALL_PORTALS: PortalConfig[] = [
     description: 'Weekly schedules, daily tasks, and one-time assignments',
     icon: 'Calendar',
     href: '/portal/scheduling',
-    active: true,h
+    active: true,
   },
   {
     id: 'payroll',
