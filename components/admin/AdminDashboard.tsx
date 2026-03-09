@@ -353,7 +353,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
 
             <div className="grid grid-cols-5 gap-4">
               {[
-                { label: 'TOTAL CLIPS', value: clips.length, icon: Film, color: 'text-brand-600' },
+                { label: 'TOTAL CLIPS', value: clips.filter(x => x.status !== 'finished').length, icon: Film, color: 'text-brand-600' },
                 { label: 'IN PROGRESS', value: clips.filter(x => x.status === 'in_progress').length, icon: TrendingUp, color: 'text-amber-500' },
                 { label: 'IN QA', value: clips.filter(x => x.status === 'in_qa' || x.status === 'submitted').length, icon: Clock, color: 'text-orange-500' },
                 { label: 'REVISIONS', value: clips.filter(x => x.status === 'needs_revision').length, icon: AlertCircle, color: 'text-red-500' },
