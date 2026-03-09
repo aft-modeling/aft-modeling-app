@@ -13,7 +13,7 @@ create table public.profiles (
   id uuid references auth.users on delete cascade primary key,
   email text not null unique,
   full_name text not null,
-  role text not null check (role in ('creative_director', 'editor', 'qa')),
+  role text not null check (role in ('creative_director', 'editor', 'qa', 'admin')),
   created_at timestamptz default now()
 );
 

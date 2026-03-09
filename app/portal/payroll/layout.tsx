@@ -1,9 +1,14 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import HomeSidebar from '@/components/HomeSidebar'
+import PayrollSidebar from '@/components/portal/PayrollSidebar'
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function PayrollPortalLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const supabase = createServerClient()
+
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) redirect('/login')
 
@@ -15,13 +20,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!profile) redirect('/login')
 
+  // Payroll is admin-only — redirect any non-admin
+  if (profile.role !== 'admin') redirect('/dashboard')
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <HomeSidebar profile={profile} />
+      <PayrollSidebar profile={profile} />
       <main className="flex-1 overflow-y-auto">
-        <div className="p-6 max-w-7xl mx-auto">
-          {children}
-        </div>
+        {children}
       </main>
     </div>
   )

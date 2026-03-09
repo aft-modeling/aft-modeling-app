@@ -14,6 +14,7 @@ interface AdminDashboardProps {
   profiles: Profile[]
   submissions: Submission[]
   finishedClips: FinishedClip[]
+  basePath?: string
 }
 
 const STATUS_COLUMNS: { status: ClipStatus; label: string; color: string }[] = [
@@ -39,12 +40,11 @@ function isOverdue(dueDate: string | null, status: string): boolean {
   return dueDate < todayStr
 }
 
-export default function AdminDashboard({ clips, profiles, submissions, finishedClips }: AdminDashboardProps) {
+export default function AdminDashboard({ clips, profiles, submissions, finishedClips, basePath = '/dashboard/admin' }: AdminDashboardProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab') || 'cd'
 
-  // Manage Team state
   const [managingRole, setManagingRole] = useState<string>('editor')
   const [showAddUser, setShowAddUser] = useState(false)
   const [newUser, setNewUser] = useState({ full_name: '', email: '', password: '' })
@@ -62,7 +62,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const currentRoleUsers = profiles.filter(p => p.role === managingRole)
 
   function setTab(tab: string) {
-    const url = tab === 'cd' ? '/dashboard/admin' : `/dashboard/admin?tab=${tab}`
+    const url = tab === 'cd' ? basePath : `${basePath}?tab=${tab}`
     router.push(url)
   }
 
@@ -194,7 +194,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                       <div>
                         <p className="text-sm font-medium text-gray-900">{clip.name}</p>
                         <p className={clsx('text-xs', isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-500')}>
-                          {isOverdue(clip.due_date, clip.status) ? 'â  Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
+                          {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
                         </p>
                       </div>
                       <span className={clsx(
@@ -218,7 +218,6 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
               <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
             )}
 
-            {/* Role Selector */}
             <div className="flex gap-1 bg-gray-50 p-1 rounded-lg w-fit">
               {MANAGEABLE_ROLES.map(role => (
                 <button
@@ -427,7 +426,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                           )}
                           <div className="flex items-center justify-between">
                             <span className={`text-xs ${isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
-                              {isOverdue(clip.due_date, clip.status) ? 'â  Overdue: ' : 'Due: '}{clip.due_date}
+                              {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{clip.due_date}
                             </span>
                             {clip.example_reel_url && <a href={clip.example_reel_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:underline">Example</a>}
                           </div>

@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
-export default async function DashboardPage() {
+export default async function SchedulingPortalPage() {
   const supabase = createServerClient()
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) redirect('/login')
@@ -14,9 +14,7 @@ export default async function DashboardPage() {
 
   if (!profile) redirect('/login')
 
-  // V2: Route to homepage based on role
-  if (profile.role === 'admin') redirect('/dashboard/admin-home')
-
-  // All employee roles go to the employee homepage
-  redirect('/dashboard/employee-home')
+  // Admin goes to admin view; everyone else goes to employee view
+  if (profile.role === 'admin') redirect('/portal/scheduling/admin')
+  redirect('/portal/scheduling/employee')
 }

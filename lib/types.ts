@@ -1,4 +1,76 @@
+
+// ── Scheduling & Tasks ──────────────────────────────────────────
+
+export interface Schedule {
+  id: string
+  user_id: string
+  day_of_week: number // 0=Sun, 6=Sat
+  is_off_day: boolean
+  created_by: string | null
+  updated_at: string
+}
+
+export interface ScheduleBlock {
+  id: string
+  schedule_id: string
+  start_time: string // HH:MM:SS
+  end_time: string   // HH:MM:SS
+  label: string
+  is_break: boolean
+  notes: string
+  created_by: string | null
+}
+
+export interface DailyTask {
+  id: string
+  title: string
+  assigned_to: string | null // null = everyone
+  created_by: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface DailyTaskCompletion {
+  id: string
+  task_id: string
+  user_id: string
+  completed_on: string // DATE
+  completed_at: string
+}
+
+export interface OneTimeTask {
+  id: string
+  title: string
+  notes: string
+  assigned_to: string
+  due_date: string | null
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  is_complete: boolean
+  completed_at: string | null
+  created_by: string | null
+  created_at: string
+}
 export type Role = 'creative_director' | 'editor' | 'qa' | 'admin'
+
+export type PortalId = 'video-editing' | 'scheduling' | 'payroll' | 'chatting' | 'client-portal'
+
+export interface PortalAccess {
+  id: string
+  user_id: string
+  portal_id: PortalId
+  granted_at: string
+  granted_by: string | null
+}
+
+export interface PortalConfig {
+  id: PortalId
+  name: string
+  description: string
+  icon: string
+  href: string
+  active: boolean
+  adminOnly?: boolean
+}
 
 export type ClipStatus =
   | 'assigned'        // CD assigned to editor
@@ -73,4 +145,37 @@ export interface FinishedClip {
   drive_view_link: string
   used_on: string | null
   finished_at: string
+}
+
+// ── Payroll ─────────────────────────────────────────────────────
+
+export interface PayPeriod {
+  id: string
+  start_date: string
+  end_date: string
+  status: 'open' | 'closed'
+  created_by: string
+  created_at: string
+  closed_at: string | null
+}
+
+export interface EditorCommission {
+  id: string
+  pay_period_id: string
+  editor_id: string
+  amount: number
+  note: string | null
+  created_by: string
+  created_at: string
+}
+
+export interface PayrollSnapshot {
+  id: string
+  pay_period_id: string
+  editor_id: string
+  finished_clips_count: number
+  base_pay: number
+  commission_amount: number
+  total_pay: number
+  snapshot_at: string
 }
