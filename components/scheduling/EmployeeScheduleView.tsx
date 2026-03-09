@@ -8,6 +8,16 @@ import clsx from 'clsx'
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
+function formatTime12(time24: string): string {
+  const [hStr, mStr] = time24.substring(0, 5).split(':')
+  let h = parseInt(hStr, 10)
+  const m = mStr
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  if (h === 0) h = 12
+  else if (h > 12) h -= 12
+  return `${h}:${m} ${ampm}`
+}
+
 interface Props {
   userId: string
 }
@@ -154,7 +164,7 @@ export default function EmployeeScheduleView({ userId }: Props) {
                           <Clock className="w-3.5 h-3.5 text-gray-400" />
                         )}
                         <span className="font-medium">
-                          {block.start_time.substring(0, 5)} â {block.end_time.substring(0, 5)}
+                          {formatTime12(block.start_time)} - {formatTime12(block.end_time)}
                         </span>
                         {block.label && <span className="text-gray-500">{block.label}</span>}
                         {block.notes && <span className="text-gray-400 text-xs">({block.notes})</span>}
