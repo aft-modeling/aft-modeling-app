@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { Profile, DailyTask, OneTimeTask } from '@/lib/types'
 import {
   ListTodo, Plus, Trash2, CheckCircle2, Circle,
-  AlertTriangle, Calendar as CalIcon, Users, User as UserIcon
+  AlertTriangle, Calendar as CalIcon, Users, User as UserIcon,
+  BarChart3
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -27,14 +28,23 @@ const PRIORITY_LABELS: Record<string, string> = {
   urgent: 'Urgent',
 }
 
+interface CompletionStatus {
+  userId: string
+  name: string
+  completed: number
+  total: number
+}
+
 export default function AdminTaskManagement({ employees }: Props) {
   const supabase = createClient()
-  const [activeTab, setActiveTab] = useState<'daily' | 'onetime'>('daily')
+  const [activeTab, setActiveTab] = useState<'daily' | 'onetime' | 'dashboard'>('daily')
 
   // Daily tasks state
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([])
   const [newDailyTitle, setNewDailyTitle] = useState('')
   const [newDailyAssignee, setNewDailyAssignee] = useState<string>('')
+  const [bulkAssignMode, setBulkAssignMode] = useState(false)
+  const [bulkSelectedEmployees, setBulkSelectedEmployees] = useState<Set<string>>(new Set())
 
   // One-time tasks state
   const [oneTimeTasks, setOneTimeTasks] = useState<OneTimeTask[]>([])
@@ -44,6 +54,10 @@ export default function AdminTaskManagement({ employees }: Props) {
   const [newOTPriority, setNewOTPriority] = useState<string>('normal')
   const [newOTNotes, setNewOTNotes] = useState('')
   const [showCompleted, setShowCompleted] = useState(false)
+
+  // Dashboard state
+  const [completionStatuses, setCompletionStatuses] = useState<CompletionStatus[]>([])
+  const [dashboardLoading, setDashboardLoading] = useState(false)
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -64,10 +78,49 @@ export default function AdminTaskManagement({ employees }: Props) {
     setOneTimeTasks(data || [])
   }, [supabase, showCompleted])
 
+  const loadDashboard = useCallback(async () => {
+    setDashboardLoading(true)
+    const today = new Date().toISOString().split('T')[0]
+
+    // Get all active daily tasks
+    const { data: tasks } = await supabase
+      .from('daily_tasks')
+      .select('*')
+      .eq('is_active', true)
+
+    // Get today's completions for all users
+    const { data: completions } = await supabase
+      .from('daily_task_completions')
+      .select('task_id, user_id')
+      .eq('completed_on', today)
+
+    const statuses: CompletionStatus[] = employees.map(emp => {
+      const assignedTasks = (tasks || []).filter(
+        t => t.assigned_to === null || t.assigned_to === emp.id
+      )
+      const empCompletions = (completions || []).filter(c => c.user_id === emp.id)
+      return {
+        userId: emp.id,
+        name: emp.full_name,
+        completed: empCompletions.length,
+        total: assignedTasks.length,
+      }
+    })
+
+    setCompletionStatuses(statuses)
+    setDashboardLoading(false)
+  }, [supabase, employees])
+
   useEffect(() => {
     loadDailyTasks()
     loadOneTimeTasks()
   }, [loadDailyTasks, loadOneTimeTasks])
+
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      loadDashboard()
+    }
+  }, [activeTab, loadDashboard])
 
   // ---- Daily Task Actions ----
   async function addDailyTask() {
@@ -75,19 +128,55 @@ export default function AdminTaskManagement({ employees }: Props) {
     setMessage(null)
     const { data: { session } } = await supabase.auth.getSession()
 
-    const { error } = await supabase.from('daily_tasks').insert({
-      title: newDailyTitle.trim(),
-      assigned_to: newDailyAssignee || null,
-      created_by: session?.user.id,
-    })
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
-    } else {
+    if (bulkAssignMode && bulkSelectedEmployees.size > 0) {
+      // Bulk assignment: create one task per selected employee
+      let successCount = 0
+      for (const empId of bulkSelectedEmployees) {
+        const { error } = await supabase.from('daily_tasks').insert({
+          title: newDailyTitle.trim(),
+          assigned_to: empId,
+          created_by: session?.user.id,
+        })
+        if (!error) successCount++
+      }
       setNewDailyTitle('')
-      setNewDailyAssignee('')
+      setBulkSelectedEmployees(new Set())
+      setBulkAssignMode(false)
       loadDailyTasks()
-      setMessage({ type: 'success', text: 'Daily task created!' })
+      setMessage({ type: 'success', text: `Task assigned to ${successCount} employee${successCount !== 1 ? 's' : ''}!` })
+    } else {
+      const { error } = await supabase.from('daily_tasks').insert({
+        title: newDailyTitle.trim(),
+        assigned_to: newDailyAssignee || null,
+        created_by: session?.user.id,
+      })
+
+      if (error) {
+        setMessage({ type: 'error', text: error.message })
+      } else {
+        setNewDailyTitle('')
+        setNewDailyAssignee('')
+        loadDailyTasks()
+        setMessage({ type: 'success', text: 'Daily task created!' })
+      }
+    }
+  }
+
+  function toggleBulkEmployee(empId: string) {
+    const updated = new Set(bulkSelectedEmployees)
+    if (updated.has(empId)) {
+      updated.delete(empId)
+    } else {
+      updated.add(empId)
+    }
+    setBulkSelectedEmployees(updated)
+  }
+
+  function selectAllEmployees() {
+    if (bulkSelectedEmployees.size === employees.length) {
+      setBulkSelectedEmployees(new Set())
+    } else {
+      setBulkSelectedEmployees(new Set(employees.map(e => e.id)))
     }
   }
 
@@ -153,7 +242,7 @@ export default function AdminTaskManagement({ employees }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 max-w-md">
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 max-w-lg">
         <button
           onClick={() => setActiveTab('daily')}
           className={clsx(
@@ -172,6 +261,16 @@ export default function AdminTaskManagement({ employees }: Props) {
         >
           One-Time Tasks
         </button>
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={clsx(
+            'flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-1',
+            activeTab === 'dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          )}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          Dashboard
+        </button>
       </div>
 
       {message && (
@@ -188,35 +287,100 @@ export default function AdminTaskManagement({ employees }: Props) {
         <div>
           {/* Add Daily Task */}
           <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Add Daily Task</h3>
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={newDailyTitle}
-                onChange={(e) => setNewDailyTitle(e.target.value)}
-                placeholder="Task title..."
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                onKeyDown={(e) => e.key === 'Enter' && addDailyTask()}
-              />
-              <select
-                value={newDailyAssignee}
-                onChange={(e) => setNewDailyAssignee(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">Everyone</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>{emp.full_name}</option>
-                ))}
-              </select>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-700">Add Daily Task</h3>
               <button
-                onClick={addDailyTask}
-                disabled={!newDailyTitle.trim()}
-                className="flex items-center gap-1 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+                onClick={() => {
+                  setBulkAssignMode(!bulkAssignMode)
+                  setBulkSelectedEmployees(new Set())
+                }}
+                className={clsx(
+                  'text-xs font-medium px-2 py-1 rounded',
+                  bulkAssignMode
+                    ? 'bg-brand-100 text-brand-700'
+                    : 'text-brand-600 hover:bg-brand-50'
+                )}
               >
-                <Plus className="w-4 h-4" />
-                Add
+                <Users className="w-3 h-3 inline mr-1" />
+                {bulkAssignMode ? 'Cancel Bulk' : 'Bulk Assign'}
               </button>
             </div>
+
+            {bulkAssignMode ? (
+              <div>
+                <input
+                  type="text"
+                  value={newDailyTitle}
+                  onChange={(e) => setNewDailyTitle(e.target.value)}
+                  placeholder="Task title..."
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 mb-3"
+                />
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-gray-500">Select employees:</span>
+                    <button
+                      onClick={selectAllEmployees}
+                      className="text-xs text-brand-600 hover:text-brand-700"
+                    >
+                      {bulkSelectedEmployees.size === employees.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {employees.map(emp => (
+                      <button
+                        key={emp.id}
+                        onClick={() => toggleBulkEmployee(emp.id)}
+                        className={clsx(
+                          'px-3 py-1.5 text-xs rounded-full border transition-colors',
+                          bulkSelectedEmployees.has(emp.id)
+                            ? 'bg-brand-100 border-brand-300 text-brand-700'
+                            : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                        )}
+                      >
+                        {emp.full_name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={addDailyTask}
+                  disabled={!newDailyTitle.trim() || bulkSelectedEmployees.size === 0}
+                  className="flex items-center gap-1 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  Assign to {bulkSelectedEmployees.size} Employee{bulkSelectedEmployees.size !== 1 ? 's' : ''}
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={newDailyTitle}
+                  onChange={(e) => setNewDailyTitle(e.target.value)}
+                  placeholder="Task title..."
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                  onKeyDown={(e) => e.key === 'Enter' && addDailyTask()}
+                />
+                <select
+                  value={newDailyAssignee}
+                  onChange={(e) => setNewDailyAssignee(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Everyone</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={addDailyTask}
+                  disabled={!newDailyTitle.trim()}
+                  className="flex items-center gap-1 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Daily Task List */}
@@ -379,6 +543,58 @@ export default function AdminTaskManagement({ employees }: Props) {
             {oneTimeTasks.length === 0 && (
               <div className="text-center py-8 text-gray-400 text-sm">
                 {showCompleted ? 'No tasks found' : 'No pending tasks'}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* DASHBOARD TAB */}
+      {activeTab === 'dashboard' && (
+        <div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-gray-700">Today&apos;s Task Completion</h3>
+              <button
+                onClick={loadDashboard}
+                className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {dashboardLoading ? (
+              <div className="text-center py-8 text-gray-400 text-sm">Loading dashboard...</div>
+            ) : (
+              <div className="space-y-3">
+                {completionStatuses.map((status) => {
+                  const pct = status.total > 0 ? Math.round((status.completed / status.total) * 100) : 0
+                  const isAllDone = status.completed === status.total && status.total > 0
+
+                  return (
+                    <div key={status.userId} className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-700 w-32 truncate">{status.name}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                        <div
+                          className={clsx(
+                            'h-full rounded-full transition-all',
+                            isAllDone ? 'bg-green-500' : pct > 0 ? 'bg-brand-500' : 'bg-gray-200'
+                          )}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className={clsx(
+                        'text-xs font-medium w-20 text-right',
+                        isAllDone ? 'text-green-600' : 'text-gray-500'
+                      )}>
+                        {status.completed}/{status.total} ({pct}%)
+                      </span>
+                    </div>
+                  )
+                })}
+                {completionStatuses.length === 0 && (
+                  <div className="text-center py-4 text-gray-400 text-sm">No employees found</div>
+                )}
               </div>
             )}
           </div>
