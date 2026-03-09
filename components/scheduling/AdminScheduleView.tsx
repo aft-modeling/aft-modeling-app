@@ -3,11 +3,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile, Schedule, ScheduleBlock } from '@/lib/types'
-import { Calendar, Plus, Trash2, Save, Clock, Coffee, Sun } from 'lucide-react'
+import { Calendar, Plus, Trash2, Save, Clock, Coffee, Sun, Copy, ClipboardPaste, Zap } from 'lucide-react'
 import clsx from 'clsx'
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+const ROLE_LABELS: Record<string, string> = {
+  creative_director: 'Creative Director',
+  editor: 'Editor',
+  qa: 'QA Reviewer',
+  admin: 'Admin',
+}
 
 interface Props {
   employees: Pick<Profile, 'id' | 'full_name' | 'email' | 'role'>[]
@@ -22,6 +29,33 @@ interface BlockForm {
   notes: string
 }
 
+const STANDARD_PRESETS = [
+  {
+    name: '9-5 Standard',
+    blocks: [
+      { start_time: '09:00', end_time: '12:00', label: 'Morning Block', is_break: false, notes: '' },
+      { start_time: '12:00', end_time: '13:00', label: 'Lunch Break', is_break: true, notes: '' },
+      { start_time: '13:00', end_time: '17:00', label: 'Afternoon Block', is_break: false, notes: '' },
+    ],
+  },
+  {
+    name: '8-4 Early',
+    blocks: [
+      { start_time: '08:00', end_time: '12:00', label: 'Morning Block', is_break: false, notes: '' },
+      { start_time: '12:00', end_time: '12:30', label: 'Lunch Break', is_break: true, notes: '' },
+      { start_time: '12:30', end_time: '16:00', label: 'Afternoon Block', is_break: false, notes: '' },
+    ],
+  },
+  {
+    name: '10-6 Late',
+    blocks: [
+      { start_time: '10:00', end_time: '13:00', label: 'Morning Block', is_break: false, notes: '' },
+      { start_time: '13:00', end_time: '14:00', label: 'Lunch Break', is_break: true, notes: '' },
+      { start_time: '14:00', end_time: '18:00', label: 'Afternoon Block', is_break: false, notes: '' },
+    ],
+  },
+]
+
 export default function AdminScheduleView({ employees }: Props) {
   const supabase = createClient()
   const [selectedEmployee, setSelectedEmployee] = useState<string>('')
@@ -32,6 +66,9 @@ export default function AdminScheduleView({ employees }: Props) {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [weekSchedules, setWeekSchedules] = useState<Record<number, { schedule: Schedule; blocks: ScheduleBlock[] }>>({})
+  const [showCopyMenu, setShowCopyMenu] = useState(false)
+  const [showCopyWeekMenu, setShowCopyWeekMenu] = useState(false)
+  const [showPresetMenu, setShowPresetMenu] = useState(false)
 
   // Load full week overview for selected employee
   const loadWeekOverview = useCallback(async (userId: string) => {
@@ -115,6 +152,163 @@ export default function AdminScheduleView({ employees }: Props) {
     const updated = [...blocks]
     updated[index] = { ...updated[index], [field]: value }
     setBlocks(updated)
+  }
+
+  function applyPreset(preset: typeof STANDARD_PRESETS[0]) {
+    setBlocks(preset.blocks.map(b => ({ ...b })))
+    setIsOffDay(false)
+    setShowPresetMenu(false)
+    setMessage({ type: 'success', text: `Applied "${preset.name}" preset. Click Save to confirm.` })
+  }
+
+  async function copyDayTo(targetDay: number) {
+    if (!selectedEmployee) return
+    setSaving(true)
+    setMessage(null)
+    setShowCopyMenu(false)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
+      // Check if target day already has a schedule
+      const { data: existingSchedule } = await supabase
+        .from('schedules')
+        .select('id')
+        .eq('user_id', selectedEmployee)
+        .eq('day_of_week', targetDay)
+        .single()
+
+      let targetScheduleId: string
+
+      if (existingSchedule) {
+        // Update existing
+        await supabase
+          .from('schedules')
+          .update({ is_off_day: isOffDay, updated_at: new Date().toISOString() })
+          .eq('id', existingSchedule.id)
+        targetScheduleId = existingSchedule.id
+
+        // Delete existing blocks
+        await supabase
+          .from('schedule_blocks')
+          .delete()
+          .eq('schedule_id', existingSchedule.id)
+      } else {
+        // Create new schedule for target day
+        const { data: newSchedule, error } = await supabase
+          .from('schedules')
+          .insert({
+            user_id: selectedEmployee,
+            day_of_week: targetDay,
+            is_off_day: isOffDay,
+            created_by: session.user.id,
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+        targetScheduleId = newSchedule.id
+      }
+
+      // Copy blocks
+      if (!isOffDay && blocks.length > 0) {
+        const blockInserts = blocks.map((b) => ({
+          schedule_id: targetScheduleId,
+          start_time: b.start_time + ':00',
+          end_time: b.end_time + ':00',
+          label: b.label,
+          is_break: b.is_break,
+          notes: b.notes,
+          created_by: session.user.id,
+        }))
+
+        const { error: blockError } = await supabase
+          .from('schedule_blocks')
+          .insert(blockInserts)
+
+        if (blockError) throw blockError
+      }
+
+      setMessage({ type: 'success', text: `Schedule copied to ${DAYS[targetDay]}!` })
+      loadWeekOverview(selectedEmployee)
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Failed to copy schedule' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function copyWeekToEmployee(targetEmployeeId: string) {
+    if (!selectedEmployee || targetEmployeeId === selectedEmployee) return
+    setSaving(true)
+    setMessage(null)
+    setShowCopyWeekMenu(false)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
+      for (let day = 0; day < 7; day++) {
+        const sourceDay = weekSchedules[day]
+        if (!sourceDay) continue
+
+        // Check if target already has schedule for this day
+        const { data: existing } = await supabase
+          .from('schedules')
+          .select('id')
+          .eq('user_id', targetEmployeeId)
+          .eq('day_of_week', day)
+          .single()
+
+        let targetScheduleId: string
+
+        if (existing) {
+          await supabase
+            .from('schedules')
+            .update({ is_off_day: sourceDay.schedule.is_off_day, updated_at: new Date().toISOString() })
+            .eq('id', existing.id)
+          await supabase.from('schedule_blocks').delete().eq('schedule_id', existing.id)
+          targetScheduleId = existing.id
+        } else {
+          const { data: newSched, error } = await supabase
+            .from('schedules')
+            .insert({
+              user_id: targetEmployeeId,
+              day_of_week: day,
+              is_off_day: sourceDay.schedule.is_off_day,
+              created_by: session.user.id,
+            })
+            .select()
+            .single()
+
+          if (error) throw error
+          targetScheduleId = newSched.id
+        }
+
+        // Copy blocks
+        if (!sourceDay.schedule.is_off_day && sourceDay.blocks.length > 0) {
+          const blockInserts = sourceDay.blocks.map((b) => ({
+            schedule_id: targetScheduleId,
+            start_time: b.start_time,
+            end_time: b.end_time,
+            label: b.label,
+            is_break: b.is_break,
+            notes: b.notes,
+            created_by: session.user.id,
+          }))
+
+          await supabase.from('schedule_blocks').insert(blockInserts)
+        }
+      }
+
+      const targetName = employees.find(e => e.id === targetEmployeeId)?.full_name || 'employee'
+      setMessage({ type: 'success', text: `Full week copied to ${targetName}!` })
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Failed to copy week' })
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleSave() {
@@ -209,7 +403,7 @@ export default function AdminScheduleView({ employees }: Props) {
           <option value="">Choose an employee...</option>
           {employees.map((emp) => (
             <option key={emp.id} value={emp.id}>
-              {emp.full_name} ({emp.role})
+              {emp.full_name} ({ROLE_LABELS[emp.role] || emp.role})
             </option>
           ))}
         </select>
@@ -219,9 +413,35 @@ export default function AdminScheduleView({ employees }: Props) {
         <>
           {/* Week Overview */}
           <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-            <h2 className="text-sm font-medium text-gray-700 mb-3">
-              Week Overview for {selectedEmployeeName}
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-medium text-gray-700">
+                Week Overview for {selectedEmployeeName}
+              </h2>
+              <div className="relative">
+                <button
+                  onClick={() => setShowCopyWeekMenu(!showCopyWeekMenu)}
+                  className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium px-2 py-1 rounded hover:bg-brand-50"
+                >
+                  <ClipboardPaste className="w-3.5 h-3.5" />
+                  Copy Week To...
+                </button>
+                {showCopyWeekMenu && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1 min-w-[200px]">
+                    {employees
+                      .filter(e => e.id !== selectedEmployee)
+                      .map(emp => (
+                        <button
+                          key={emp.id}
+                          onClick={() => copyWeekToEmployee(emp.id)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-700"
+                        >
+                          {emp.full_name} ({ROLE_LABELS[emp.role] || emp.role})
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="grid grid-cols-7 gap-2">
               {DAYS.map((day, i) => {
                 const dayData = weekSchedules[i]
@@ -249,7 +469,7 @@ export default function AdminScheduleView({ employees }: Props) {
                         <div className="text-xs mt-1 text-gray-600">{blockCount} block{blockCount !== 1 ? 's' : ''}</div>
                       )
                     ) : (
-                      <div className="text-xs mt-1 text-gray-300">â</div>
+                      <div className="text-xs mt-1 text-gray-300">Not set</div>
                     )}
                   </button>
                 )
@@ -263,21 +483,71 @@ export default function AdminScheduleView({ employees }: Props) {
               <h2 className="text-lg font-semibold text-gray-900">
                 {DAYS[selectedDay]}
               </h2>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isOffDay}
-                  onChange={(e) => setIsOffDay(e.target.checked)}
-                  className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                />
-                <span className="text-sm text-gray-600">Day Off</span>
-              </label>
+              <div className="flex items-center gap-3">
+                {/* Quick Preset Button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowPresetMenu(!showPresetMenu)}
+                    className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-medium px-2 py-1 rounded hover:bg-amber-50"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Quick Preset
+                  </button>
+                  {showPresetMenu && (
+                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1 min-w-[160px]">
+                      {STANDARD_PRESETS.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => applyPreset(preset)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-700"
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Copy Day Button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowCopyMenu(!showCopyMenu)}
+                    className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium px-2 py-1 rounded hover:bg-brand-50"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy Day To...
+                  </button>
+                  {showCopyMenu && (
+                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1 min-w-[140px]">
+                      {DAYS.map((dayName, i) => (
+                        i !== selectedDay && (
+                          <button
+                            key={i}
+                            onClick={() => copyDayTo(i)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-700"
+                          >
+                            {dayName}
+                          </button>
+                        )
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isOffDay}
+                    onChange={(e) => setIsOffDay(e.target.checked)}
+                    className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="text-sm text-gray-600">Day Off</span>
+                </label>
+              </div>
             </div>
 
             {isOffDay ? (
               <div className="text-center py-8 text-gray-400">
                 <Sun className="w-8 h-8 mx-auto mb-2 text-amber-400" />
-                <p>This is a day off â no schedule blocks needed.</p>
+                <p>This is a day off - no schedule blocks needed.</p>
               </div>
             ) : (
               <>
