@@ -32,7 +32,7 @@ export default async function PortalAdminPage() {
     supabase
       .from('finished_clips')
       .select('*')
-      .order('created_at', { ascending: false }),
+      .order('finished_at', { ascending: false }),
   ])
 
   return (
