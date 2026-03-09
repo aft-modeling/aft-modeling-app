@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { DailyTask, DailyTaskCompletion, OneTimeTask } from '@/lib/types'
 import {
   CheckSquare, CheckCircle2, Circle, AlertTriangle,
-  Calendar as CalIcon, Clock
+  Calendar as CalIcon, Clock, Undo2
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -31,6 +31,7 @@ export default function EmployeeTaskView({ userId }: Props) {
   const [oneTimeTasks, setOneTimeTasks] = useState<OneTimeTask[]>([])
 
   const [loading, setLoading] = useState(true)
+  const [confirmingTaskId, setConfirmingTaskId] = useState<string | null>(null)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -73,7 +74,19 @@ export default function EmployeeTaskView({ userId }: Props) {
 
   async function toggleDailyCompletion(taskId: string) {
     if (todayCompletions.has(taskId)) {
-      // Can't un-complete (simplicity) â or optionally we could delete the completion
+      // Un-complete: delete the completion record
+      const { error } = await supabase
+        .from('daily_task_completions')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('user_id', userId)
+        .eq('completed_on', today)
+
+      if (!error) {
+        const updated = new Set(todayCompletions)
+        updated.delete(taskId)
+        setTodayCompletions(updated)
+      }
       return
     }
 
@@ -96,6 +109,16 @@ export default function EmployeeTaskView({ userId }: Props) {
 
     if (!error) {
       setOneTimeTasks(oneTimeTasks.filter(t => t.id !== taskId))
+    }
+    setConfirmingTaskId(null)
+  }
+
+  function handleOneTimeClick(taskId: string) {
+    if (confirmingTaskId === taskId) {
+      // Already showing confirm, cancel it
+      setConfirmingTaskId(null)
+    } else {
+      setConfirmingTaskId(taskId)
     }
   }
 
@@ -159,11 +182,17 @@ export default function EmployeeTaskView({ userId }: Props) {
                     <Circle className="w-5 h-5 text-gray-300 flex-shrink-0" />
                   )}
                   <span className={clsx(
-                    'text-sm font-medium',
+                    'text-sm font-medium flex-1',
                     isComplete ? 'text-gray-400 line-through' : 'text-gray-900'
                   )}>
                     {task.title}
                   </span>
+                  {isComplete && (
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <Undo2 className="w-3 h-3" />
+                      Undo
+                    </span>
+                  )}
                 </button>
               )
             })}
@@ -183,6 +212,7 @@ export default function EmployeeTaskView({ userId }: Props) {
           <div className="space-y-2">
             {oneTimeTasks.map((task) => {
               const isOverdue = task.due_date && task.due_date < today
+              const isConfirming = confirmingTaskId === task.id
               return (
                 <div
                   key={task.id}
@@ -191,12 +221,29 @@ export default function EmployeeTaskView({ userId }: Props) {
                     isOverdue ? 'border-red-200' : 'border-gray-200'
                   )}
                 >
-                  <button
-                    onClick={() => completeOneTimeTask(task.id)}
-                    className="flex-shrink-0 hover:scale-110 transition-transform"
-                  >
-                    <Circle className="w-5 h-5 text-gray-300 hover:text-green-400" />
-                  </button>
+                  {isConfirming ? (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => completeOneTimeTask(task.id)}
+                        className="px-2 py-1 bg-green-500 text-white text-xs rounded font-medium hover:bg-green-600"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setConfirmingTaskId(null)}
+                        className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded font-medium hover:bg-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleOneTimeClick(task.id)}
+                      className="flex-shrink-0 hover:scale-110 transition-transform"
+                    >
+                      <Circle className="w-5 h-5 text-gray-300 hover:text-green-400" />
+                    </button>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900">{task.title}</p>
                     <div className="flex items-center gap-3 mt-0.5">
