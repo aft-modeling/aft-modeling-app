@@ -45,6 +45,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab') || 'cd'
 
+  // Manage Team state
   const [managingRole, setManagingRole] = useState<string>('editor')
   const [showAddUser, setShowAddUser] = useState(false)
   const [newUser, setNewUser] = useState({ full_name: '', email: '', password: '' })
@@ -56,6 +57,8 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingClip, setEditingClip] = useState<any>(null)
   const [cdEditorFilter, setCdEditorFilter] = useState('all')
+  const [editingUser, setEditingUser] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ full_name: '', email: '', password: '' })
 
   const editors = profiles.filter(p => p.role === 'editor')
   const currentRoleConfig = MANAGEABLE_ROLES.find(r => r.key === managingRole)!
@@ -101,6 +104,45 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to remove user')
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function startEditUser(user: Profile) {
+    setEditingUser(user.id)
+    setEditForm({ full_name: user.full_name, email: user.email, password: '' })
+    setError('')
+  }
+
+  async function handleUpdateUser(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingUser) return
+    setLoading(true)
+    setError('')
+    try {
+      const payload: Record<string, string> = { userId: editingUser }
+      const originalUser = profiles.find(p => p.id === editingUser)
+      if (editForm.full_name && editForm.full_name !== originalUser?.full_name) payload.full_name = editForm.full_name
+      if (editForm.email && editForm.email !== originalUser?.email) payload.email = editForm.email
+      if (editForm.password) payload.password = editForm.password
+
+      if (Object.keys(payload).length <= 1) {
+        setEditingUser(null)
+        return
+      }
+
+      const res = await fetch('/api/admin/update-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update user')
+      setEditingUser(null)
       router.refresh()
     } catch (err: any) {
       setError(err.message)
@@ -194,7 +236,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                       <div>
                         <p className="text-sm font-medium text-gray-900">{clip.name}</p>
                         <p className={clsx('text-xs', isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-500')}>
-                          {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
+                          {isOverdue(clip.due_date, clip.status) ? '\u26a0 Overdue: ' : 'Due: '}{new Date(clip.due_date).toLocaleDateString()}
                         </p>
                       </div>
                       <span className={clsx(
@@ -218,6 +260,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
               <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
             )}
 
+            {/* Role Selector */}
             <div className="flex gap-1 bg-gray-50 p-1 rounded-lg w-fit">
               {MANAGEABLE_ROLES.map(role => (
                 <button
@@ -302,27 +345,88 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {currentRoleUsers.map(user => (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{user.full_name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {new Date(user.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleRemoveUser(user.id, user.full_name, managingRole)}
-                          disabled={loading}
-                          className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
+                    editingUser === user.id ? (
+                      <tr key={user.id} className="bg-brand-50/30">
+                        <td colSpan={4} className="px-4 py-4">
+                          <form onSubmit={handleUpdateUser} className="space-y-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Pencil size={14} className="text-brand-600" />
+                              <span className="text-sm font-semibold text-gray-900">Edit {user.full_name}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+                                <input
+                                  type="text"
+                                  value={editForm.full_name}
+                                  onChange={e => setEditForm(prev => ({ ...prev, full_name: e.target.value }))}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                                <input
+                                  type="email"
+                                  value={editForm.email}
+                                  onChange={e => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">New Password <span className="text-gray-400 font-normal">(leave blank to keep)</span></label>
+                                <input
+                                  type="text"
+                                  value={editForm.password}
+                                  onChange={e => setEditForm(prev => ({ ...prev, password: e.target.value }))}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                  placeholder="Enter new password"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button type="submit" disabled={loading}
+                                className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+                              >
+                                {loading ? 'Saving...' : 'Save Changes'}
+                              </button>
+                              <button type="button" onClick={() => setEditingUser(null)}
+                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={user.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{user.full_name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-3">
+                          <button
+                            onClick={() => startEditUser(user)}
+                            className="text-brand-600 hover:text-brand-800 text-sm font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleRemoveUser(user.id, user.full_name, managingRole)}
+                            disabled={loading}
+                            className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    )
                   ))}
                   {currentRoleUsers.length === 0 && (
                     <tr>
@@ -426,7 +530,7 @@ export default function AdminDashboard({ clips, profiles, submissions, finishedC
                           )}
                           <div className="flex items-center justify-between">
                             <span className={`text-xs ${isOverdue(clip.due_date, clip.status) ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
-                              {isOverdue(clip.due_date, clip.status) ? '⚠ Overdue: ' : 'Due: '}{clip.due_date}
+                              {isOverdue(clip.due_date, clip.status) ? '\u26a0 Overdue: ' : 'Due: '}{clip.due_date}
                             </span>
                             {clip.example_reel_url && <a href={clip.example_reel_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:underline">Example</a>}
                           </div>
