@@ -52,7 +52,7 @@ export interface OneTimeTask {
 }
 export type Role = 'creative_director' | 'editor' | 'qa' | 'admin'
 
-export type PortalId = 'video-editing' | 'scheduling' | 'payroll' | 'chatting' | 'client-portal'
+export type PortalId = 'video-editing' | 'scheduling' | 'payroll' | 'chatting' | 'client-portal' | 'meta-ads'
 
 export interface PortalAccess {
   id: string
@@ -178,4 +178,58 @@ export interface PayrollSnapshot {
   commission_amount: number
   total_pay: number
   snapshot_at: string
+}
+
+// ── Meta Ads ────────────────────────────────────────────────────
+
+export type ReelStatus = 'Active' | 'Posted'
+export type ExpenseType = 'Funded' | 'Paid'
+
+export interface MetaAdsReel {
+  id: string
+  created_at: string
+  name: string | null
+  attachment_url: string | null
+  status: ReelStatus | null
+  trial_boosted: 'Yes' | 'No' | null
+  eligible_for_reboost: 'YES' | 'NO' | null
+  boosted_after_trial: 'Currently active' | 'No' | null
+  date_reel_posted: string | null
+  notes: string | null
+  expect_daily_spend: number
+  expected_days_ran: number
+  total_expected_spend: number  // generated column
+  days_remaining: number
+  link_to_reel: string | null
+  total_views: number
+  total_likes: number
+  view_to_like_ratio: number | null  // generated column
+  scrape: 'YES' | null
+}
+
+export interface MetaAdsAccountLog {
+  id: string
+  created_at: string
+  date: string
+  followers: number | null
+  all_time_followers_gained: number | null  // generated column
+  twenty_four_hr_gain: number | null
+  cpf: number | null
+}
+
+export interface MetaAdsRealcambliss {
+  id: string
+  created_at: string
+  date: string
+  followers: number | null
+  twenty_four_hr_gain: number | null
+}
+
+export interface MetaAdsExpense {
+  id: string
+  created_at: string
+  date: string
+  amount: number | null
+  notes: string | null
+  type: ExpenseType | null
 }

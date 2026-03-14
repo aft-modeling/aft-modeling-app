@@ -42,4 +42,13 @@ export const ALL_PORTALS: PortalConfig[] = [
     href: '/portal/client-portal',
     active: false,
   },
+  {
+    id: 'meta-ads',
+    name: 'Meta Ads',
+    description: 'Meta advertising campaign management — reels, expenses, follower tracking',
+    icon: 'BarChart3',
+    href: '/portal/meta-ads',
+    active: true,
+    adminOnly: true,
+  },
 ]

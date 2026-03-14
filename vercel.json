@@ -3,6 +3,14 @@
     {
       "path": "/api/check-overdue",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/meta-ads-daily",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/cron/realcambliss-daily",
+      "schedule": "0 20 * * *"
     }
   ]
 }
