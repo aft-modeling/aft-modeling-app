@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/realcambliss-daily",
       "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/cron/daily-task-report",
+      "schedule": "0 2 * * *"
     }
   ]
 }
