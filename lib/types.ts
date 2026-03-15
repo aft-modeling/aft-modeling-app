@@ -1,5 +1,4 @@
-
-// ── Scheduling & Tasks ──────────────────────────────────────────
+// ── Scheduling & Tasks ────────────────────────────
 
 export interface Schedule {
   id: string
@@ -48,6 +47,17 @@ export interface DailyTaskReport {
   total_completed: number
   email_sent: boolean
   created_at: string
+}
+
+export interface ReportSettings {
+  id: string
+  daily_enabled: boolean
+  weekly_enabled: boolean
+  daily_send_hour: number
+  daily_send_minute: number
+  recipients: string[]
+  updated_at: string
+  updated_by: string | null
 }
 
 export interface OneTimeTask {
@@ -159,7 +169,7 @@ export interface FinishedClip {
   finished_at: string
 }
 
-// ── Payroll ─────────────────────────────────────────────────────
+// ── Payroll ────────────────────
 
 export interface PayPeriod {
   id: string
@@ -192,7 +202,7 @@ export interface PayrollSnapshot {
   snapshot_at: string
 }
 
-// ── Meta Ads ────────────────────────────────────────────────────
+// ── Meta Ads ──────────────────────────────────────────────────────────
 
 export type ReelStatus = 'Active' | 'Posted'
 export type ExpenseType = 'Funded' | 'Paid'
