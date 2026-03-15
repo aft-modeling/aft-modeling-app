@@ -33,7 +33,11 @@ export default function EmployeeTaskView({ userId }: Props) {
   const [loading, setLoading] = useState(true)
   const [confirmingTaskId, setConfirmingTaskId] = useState<string | null>(null)
 
-  const today = new Date().toISOString().split('T')[0]
+  // Use PST date (UTC-8) to match business timezone
+  const now = new Date()
+  const pstOffset = -8 * 60 // PST is UTC-8
+  const pstTime = new Date(now.getTime() + (pstOffset + now.getTimezoneOffset()) * 60000)
+  const today = pstTime.toISOString().split('T')[0]
 
   const loadDailyTasks = useCallback(async () => {
     // Fetch active daily tasks for this user or everyone
