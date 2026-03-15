@@ -60,7 +60,27 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Step 3: Get all active daily tasks ──
-    const { data: allTasks      }
+    const { data: allTasks } = await supabase
+      .from('daily_tasks')
+      .select('id, title, assigned_to')
+      .eq('is_active', true)
+
+    if (!allTasks || allTasks.length === 0) {
+      return NextResponse.json({ success: true, message: 'No active daily tasks', reports: 0 })
+    }
+
+    // ── Step 4: Get all completions for today ──
+    const { data: allCompletions } = await supabase
+      .from('daily_task_completions')
+      .select('task_id, user_id, completed_at')
+      .eq('completed_on', reportDate)
+
+    const completionMap = new Map<string, Map<string, string>>()
+    // Map<userId, Map<taskId, completed_at>>
+    for (const c of (allCompletions || [])) {
+      if (!completionMap.has(c.user_id)) {
+        completionMap.set(c.user_id, new Map())
+      }
       completionMap.get(c.user_id)!.set(c.task_id, c.completed_at)
     }
 
@@ -205,7 +225,7 @@ export async function GET(req: NextRequest) {
 }
 
 
-// ── Email Builder ──────────────────────────────────────────────
+// ── Email Builder ──────────────────────────────────────────────────────────
 
 function buildEmailHtml(reports: any[], reportDate: string): string {
   const dateDisplay = formatDateForDisplay(reportDate)
