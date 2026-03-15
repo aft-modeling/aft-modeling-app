@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
 import clsx from 'clsx'
 import {
-  Calendar, Clock, CheckSquare, ListTodo,
+  Calendar, Clock, CheckSquare, ListTodo, FileBarChart,
   LogOut, User, ArrowLeft, Shield
 } from 'lucide-react'
 
@@ -31,8 +31,9 @@ export default function SchedulingSidebar({ profile }: SidebarProps) {
 
   const links = profile.role === 'admin'
     ? [
-        { href: '/portal/scheduling/admin',       icon: Calendar,    label: 'Weekly Schedules' },
-        { href: '/portal/scheduling/admin/tasks',  icon: ListTodo,    label: 'Task Management' },
+        { href: '/portal/scheduling/admin',           icon: Calendar,      label: 'Weekly Schedules' },
+        { href: '/portal/scheduling/admin/tasks',     icon: ListTodo,      label: 'Task Management' },
+        { href: '/portal/scheduling/admin/reports',   icon: FileBarChart,  label: 'Automated Reports' },
       ]
     : [
         { href: '/portal/scheduling/employee',       icon: Clock,       label: 'My Schedule' },
