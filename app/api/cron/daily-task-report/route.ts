@@ -10,13 +10,13 @@ export const dynamic = 'force-dynamic'
  *
  * Runs daily at 6 PM PST (2 AM UTC) via Vercel Cron.
  *
- * 1. For each employee with scheduling access:
+ * 1. Checks report_settings to see if daily reports are enabled.
+ * 2. For each employee with scheduling access:
  *    - Snapshots their daily task completions (with timestamps)
  *    - Records which tasks were missed
  *    - Saves to daily_task_reports table
- * 2. Sends a consolidated email to jay@aftmodeling.com
- *    with every employee's form for that day.
- * 3. Checkboxes reset automatically (the employee view queries
+ * 3. Sends a consolidated email to all configured recipients.
+ * 4. Checkboxes reset automatically (the employee view queries
  *    by today's date, so a new day = fresh checkboxes).
  */
 export async function GET(req: NextRequest) {
@@ -25,6 +25,26 @@ export async function GET(req: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
+
+    // ── Step 0: Check report settings ──
+    const { data: settings } = await supabase
+      .from('report_settings')
+      .select('*')
+      .eq('id', 'default')
+      .single()
+
+    if (settings && !settings.daily_enabled) {
+      return NextResponse.json({
+        success: true,
+        message: 'Daily reports are disabled in settings',
+        skipped: true,
+      })
+    }
+
+    // Get recipients from settings, fallback to default
+    const recipients: string[] = settings?.recipients && Array.isArray(settings.recipients)
+      ? settings.recipients
+      : ['jay@aftmodeling.com']
 
     // Use PST date for the report (UTC-8)
     // At 2 AM UTC, it's 6 PM PST the previous day
@@ -171,7 +191,7 @@ export async function GET(req: NextRequest) {
     let emailSent = false
     const resendKey = process.env.RESEND_API_KEY
 
-    if (resendKey && reports.length > 0) {
+    if (resendKey && reports.length > 0 && recipients.length > 0) {
       try {
         const resend = new Resend(resendKey)
 
@@ -179,7 +199,7 @@ export async function GET(req: NextRequest) {
 
         const { error: emailError } = await resend.emails.send({
           from: 'AFT Tasks <tasks@aftmodeling.com>',
-          to: ['jay@aftmodeling.com'],
+          to: recipients,
           subject: `AFT Daily Task Report — ${formatDateForDisplay(reportDate)}`,
           html: emailHtml,
         })
@@ -209,6 +229,7 @@ export async function GET(req: NextRequest) {
       report_date: reportDate,
       employees_reported: reports.length,
       email_sent: emailSent,
+      recipients_count: recipients.length,
       summary: reports.map(r => ({
         name: r.name,
         completed: r.totalCompleted,
@@ -231,8 +252,8 @@ function buildEmailHtml(reports: any[], reportDate: string): string {
   const dateDisplay = formatDateForDisplay(reportDate)
 
   // Calculate overall stats
-  const totalTasks = reports.reduce((sum, r) => sum + r.totalAssigned, 0)
-  const totalDone = reports.reduce((sum, r) => sum + r.totalCompleted, 0)
+  const totalTasks = reports.reduce((sum: number, r: any) => sum + r.totalAssigned, 0)
+  const totalDone = reports.reduce((sum: number, r: any) => sum + r.totalCompleted, 0)
   const overallPct = totalTasks > 0 ? Math.round((totalDone / totalTasks) * 100) : 0
 
   let html = `
