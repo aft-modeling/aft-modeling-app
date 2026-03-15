@@ -38,6 +38,18 @@ export interface DailyTaskCompletion {
   completed_at: string
 }
 
+export interface DailyTaskReport {
+  id: string
+  user_id: string
+  report_date: string
+  tasks_completed: { task_id: string; title: string; completed_at: string }[]
+  tasks_missed: { task_id: string; title: string }[]
+  total_assigned: number
+  total_completed: number
+  email_sent: boolean
+  created_at: string
+}
+
 export interface OneTimeTask {
   id: string
   title: string
