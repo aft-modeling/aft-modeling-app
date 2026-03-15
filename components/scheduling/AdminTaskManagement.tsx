@@ -80,7 +80,11 @@ export default function AdminTaskManagement({ employees }: Props) {
 
   const loadDashboard = useCallback(async () => {
     setDashboardLoading(true)
-    const today = new Date().toISOString().split('T')[0]
+    // Use PST date (UTC-8) to match business timezone
+    const now = new Date()
+    const pstOffset = -8 * 60 // PST is UTC-8
+    const pstTime = new Date(now.getTime() + (pstOffset + now.getTimezoneOffset()) * 60000)
+    const today = pstTime.toISOString().split('T')[0]
 
     // Get all active daily tasks
     const { data: tasks } = await supabase
